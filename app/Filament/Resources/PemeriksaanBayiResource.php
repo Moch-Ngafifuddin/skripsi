@@ -187,12 +187,11 @@ class PemeriksaanBayiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                Tables\Columns\TextColumn::make('pasien.nama')
-                    ->label('Nama Balita')
-                    ->searchable()
-                    ->sortable()
-                    ->weight('bold'),
+        ->modifyQueryUsing(fn ($query) => $query->whereDate('created_at', now()->toDateString()))
+        ->columns([
+            Tables\Columns\TextColumn::make('pasien.nama')
+                ->label('Nama Balita')
+                ->searchable(),
                 
                 // --- KOLOM KETERANGAN UMUR YANG DIAMBIL LANGSUNG DARI DATABASE ---
                 Tables\Columns\TextColumn::make('keterangan_umur')
