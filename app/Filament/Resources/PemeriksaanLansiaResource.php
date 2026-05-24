@@ -14,7 +14,11 @@ use Filament\Tables\Table;
 class PemeriksaanLansiaResource extends Resource
 {
     protected static ?string $model = PemeriksaanLansia::class;
-
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-heart'; // Ikon Hati/Kesehatan
     protected static ?string $navigationGroup = 'Pemeriksaan';
     protected static ?string $navigationLabel = 'Posyandu Lansia';
@@ -167,14 +171,5 @@ class PemeriksaanLansiaResource extends Resource
             'create' => Pages\CreatePemeriksaanLansia::route('/create'),
             'edit' => Pages\EditPemeriksaanLansia::route('/{record}/edit'),
         ];
-    }
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
-            return true;
-        }
-        $akses = Auth::user()?->akses_menu ?? [];
-        return in_array('lansia', $akses); // Harus sama dengan kunci di UserResource
     }
 }

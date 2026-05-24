@@ -30,15 +30,15 @@ class RiwayatResource extends Resource
                     ->label('Nama Pasien')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('kategori_pasien')
-                    ->label('Kategori')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'balita' => 'pink',
-                        'remaja' => 'blue',
-                        'lansia' => 'emerald',
-                        default => 'gray',
-                    }),
+                // Tables\Columns\TextColumn::make('kategori_pasien')
+                //     ->label('Kategori')
+                //     ->badge()
+                //     ->color(fn (string $state): string => match ($state) {
+                //         'balita' => 'pink',
+                //         'remaja' => 'blue',
+                //         'lansia' => 'emerald',
+                //         default => 'gray',
+                //     }),
                 Tables\Columns\TextColumn::make('nik')
                     ->label('NIK')
                     ->searchable(),

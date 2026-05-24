@@ -16,7 +16,11 @@ use Illuminate\Support\Facades\Auth;
 class PemeriksaanBayiResource extends Resource
 {
     protected static ?string $model = PemeriksaanBayi::class;
-
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+    protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-face-smile'; 
     protected static ?string $navigationGroup = 'Pemeriksaan';
     protected static ?string $navigationLabel = 'Posyandu Balita';
@@ -268,14 +272,5 @@ class PemeriksaanBayiResource extends Resource
     public static function canCreate(): bool
     {
         return in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin']);
-    }
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
-            return true;
-        }
-        $akses = Auth::user()?->akses_menu ?? [];
-        return in_array('bayi', $akses); 
     }
 }

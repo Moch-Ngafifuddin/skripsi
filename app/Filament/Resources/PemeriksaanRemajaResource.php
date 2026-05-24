@@ -16,6 +16,12 @@ class PemeriksaanRemajaResource extends Resource
 {
     protected static ?string $model = PemeriksaanRemaja::class;
 
+    // 1. KITA CUKUPKAN SATU FUNGSI INI SAJA DI ATAS UNTUK MENYEMBUNYIKAN MENU
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+    
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
     protected static ?string $navigationGroup = 'Pemeriksaan';
     protected static ?string $navigationLabel = 'Posyandu Remaja';
@@ -77,7 +83,7 @@ class PemeriksaanRemajaResource extends Resource
                         Forms\Components\TextInput::make('kadar_hb')
                             ->label('Hemoglobin (Hb)')
                             ->numeric()
-                            ->step(0.1) // Bisa desimal, misal 11.5
+                            ->step(0.1)
                             ->suffix('g/dL'),
 
                         Forms\Components\TextInput::make('lingkar_lengan')
@@ -114,7 +120,6 @@ class PemeriksaanRemajaResource extends Resource
                     ->searchable()
                     ->weight('bold'),
 
-                // Menggabungkan Tensi menjadi satu kolom (Contoh: 110/80)
                 Tables\Columns\TextColumn::make('tensi')
                     ->label('Tensi')
                     ->state(function (PemeriksaanRemaja $record): string {
@@ -128,7 +133,6 @@ class PemeriksaanRemajaResource extends Resource
                     ->label('Hb')
                     ->suffix(' g/dL')
                     ->color(fn (string $state): string => $state < 12 ? 'danger' : 'success'), 
-                    // ^ Otomatis MERAH jika Hb < 12 (Anemia)
 
                 Tables\Columns\IconColumn::make('minum_ttd')
                     ->label('TTD')
@@ -158,14 +162,5 @@ class PemeriksaanRemajaResource extends Resource
             'create' => Pages\CreatePemeriksaanRemaja::route('/create'),
             'edit' => Pages\EditPemeriksaanRemaja::route('/{record}/edit'),
         ];
-    }
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
-            return true;
-        }
-        $akses = Auth::user()?->akses_menu ?? [];
-        return in_array('remaja', $akses); // Harus sama dengan kunci di UserResource
     }
 }

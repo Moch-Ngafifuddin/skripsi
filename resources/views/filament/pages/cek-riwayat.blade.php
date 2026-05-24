@@ -1,13 +1,23 @@
-<div class="space-y-4">
+<div class="space-y-6">
     
     @php
-        // Mengubah teks kategori menjadi huruf kecil semua agar pencocokan data 100% akurat
-        $kategori = strtolower($pasien->kategori_pasien ?? '');
+        // Menguji langsung keberadaan data pemeriksaan tanpa mengecek kolom kategori
+        $punyaDataBalita  = $pasien->pemeriksaanBayi && $pasien->pemeriksaanBayi->count() > 0;
+        $punyaDataRemaja  = $pasien->pemeriksaanRemaja && $pasien->pemeriksaanRemaja->count() > 0;
+        $punyaDataLansia  = $pasien->pemeriksaanLansia && $pasien->pemeriksaanLansia->count() > 0;
     @endphp
 
-    {{-- ================= TABEL RIWAYAT BALITA ================= --}}
-    @if(in_array($kategori, ['balita', 'bayi']))
-        @if($pasien->pemeriksaanBayi && $pasien->pemeriksaanBayi->count() > 0)
+    {{-- JIKA SAMA SEKALI BELUM PERNAH PERIKSA --}}
+    @if(!$punyaDataBalita && !$punyaDataRemaja && !$punyaDataLansia)
+        <div class="text-center py-6">
+            <p class="text-sm text-gray-500">Belum ada riwayat pemeriksaan medis yang tercatat untuk pasien ini.</p>
+        </div>
+    @endif
+
+    {{-- ================= TAMPILKAN TABEL BALITA (JIKA ADA DATANYA) ================= --}}
+    @if($punyaDataBalita)
+        <div class="space-y-2">
+            <h4 class="text-xs font-bold text-pink-600 uppercase tracking-wider">Riwayat Posyandu Balita</h4>
             <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
                 <table class="w-full text-left border-collapse text-sm">
                     <thead>
@@ -38,13 +48,13 @@
                     </tbody>
                 </table>
             </div>
-        @else
-            <p class="text-sm text-gray-500 text-center py-4">Belum ada riwayat pemeriksaan untuk balita ini.</p>
-        @endif
+        </div>
+    @endif
 
-    {{-- ================= TABEL RIWAYAT REMAJA ================= --}}
-    @elseif($kategori === 'remaja')
-        @if($pasien->pemeriksaanRemaja && $pasien->pemeriksaanRemaja->count() > 0)
+    {{-- ================= TAMPILKAN TABEL REMAJA (JIKA ADA DATANYA) ================= --}}
+    @if($punyaDataRemaja)
+        <div class="space-y-2">
+            <h4 class="text-xs font-bold text-blue-600 uppercase tracking-wider">Riwayat Posyandu Remaja</h4>
             <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
                 <table class="w-full text-left border-collapse text-sm">
                     <thead>
@@ -69,13 +79,13 @@
                     </tbody>
                 </table>
             </div>
-        @else
-            <p class="text-sm text-gray-500 text-center py-4">Belum ada riwayat pemeriksaan untuk remaja ini.</p>
-        @endif
+        </div>
+    @endif
 
-    {{-- ================= TABEL RIWAYAT LANSIA ================= --}}
-    @elseif($kategori === 'lansia')
-        @if($pasien->pemeriksaanLansia && $pasien->pemeriksaanLansia->count() > 0)
+    {{-- ================= TAMPILKAN TABEL LANSIA (JIKA ADA DATANYA) ================= --}}
+    @if($punyaDataLansia)
+        <div class="space-y-2">
+            <h4 class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Riwayat Posyandu Lansia</h4>
             <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
                 <table class="w-full text-left border-collapse text-sm">
                     <thead>
@@ -102,14 +112,7 @@
                     </tbody>
                 </table>
             </div>
-        @else
-            <p class="text-sm text-gray-500 text-center py-4">Belum ada riwayat pemeriksaan untuk lansia ini.</p>
-        @endif
-    @else
-        {{-- fallback jika data kategori_pasien di luar ekspektasi --}}
-        <p class="text-sm text-amber-600 text-center py-4 bg-amber-50 rounded-xl border border-amber-200">
-            Kategori pasien tidak dikenali: "{{ $pasien->kategori_pasien ?? 'Kosong' }}"
-        </p>
+        </div>
     @endif
 
 </div>
