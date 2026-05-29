@@ -15,7 +15,7 @@ class Pendaftaran extends Page
     protected static ?string $navigationLabel = 'Pendaftaran';
 
     // Judul Halaman Utama
-    protected ?string $heading = 'Menu Pendaftaran Posyandu';
+    protected ?string $heading = 'Pendaftaran Posyandu';
 
     // Kelompok menu di sidebar
     protected static ?string $navigationGroup = 'Pelayanan';
@@ -23,18 +23,12 @@ class Pendaftaran extends Page
 
     protected static string $view = 'filament.pages.pendaftaran';
 
-    /**
-     * Mengirim data ke view blade
-     */
     public function getViewData(): array
     {
         $user = Auth::user();
         
         return [
-            // Membaca kolom meja_tugas dari data user yang login
             'mejaTugas' => $user->meja_tugas ?? 'Belum Diatur',
-            
-            // Membuat URL otomatis menuju form tambah (Create) Pasien
             'urlDaftarBalita' => PasienResource::getUrl('create', ['kategori' => 'balita']),
             'urlDaftarRemaja' => PasienResource::getUrl('create', ['kategori' => 'remaja']),
             'urlDaftarLansia' => PasienResource::getUrl('create', ['kategori' => 'lansia']),

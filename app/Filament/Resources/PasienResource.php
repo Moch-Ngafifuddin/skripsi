@@ -9,18 +9,16 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class PasienResource extends Resource
 {
     protected static ?string $model = Pasien::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationLabel = 'Data Pasien';
-    protected static ?string $pluralModelLabel = 'Data Pasien';
+    protected static ?string $navigationLabel = 'Data Balita';
+    protected static ?string $pluralModelLabel = 'Data Balita';
     protected static ?string $navigationGroup = 'Master Data';
-    protected static ?string $modelLabel = 'Data Pasien';
+    protected static ?string $modelLabel = 'Data Balita';
 
     public static function form(Form $form): Form
     {
@@ -28,7 +26,7 @@ class PasienResource extends Resource
             ->schema([
                 // --- IDENTITAS UMUM ---
                 Forms\Components\Section::make('Identitas Umum')
-                    ->description('Data wajib untuk Balita, Remaja, dan Lansia')
+                    ->description('Data wajib untuk Balita')
                     ->schema([
                         Forms\Components\TextInput::make('nik')
                             ->label('NIK')
@@ -119,17 +117,91 @@ class PasienResource extends Resource
                 Tables\Columns\TextColumn::make('nama')->searchable()->weight('bold'),
                 Tables\Columns\TextColumn::make('tgl_lahir')
                     ->label('Umur')
-                    ->formatStateUsing(fn (string $state): string => Carbon::parse($state)->age . ' Thn'),
+                    ->formatStateUsing(function (?string $state): string {
+                        if (!$state) {
+                            return '-';
+                        }
+                        $umur = \Carbon\Carbon::parse($state)->diff(\Carbon\Carbon::now());
+                        return "{$umur->y} Tahun {$umur->m} Bulan {$umur->d} Hari";
+                    }),
                 Tables\Columns\TextColumn::make('jenis_kelamin')
                     ->badge()
                     ->colors(['info' => 'L', 'danger' => 'P']),
             ])
+            // Filter otomatis agar pasien yang diarsipkan ("is_arsip" => true) tidak muncul di daftar aktif
+            ->modifyQueryUsing(fn ($query) => $query->where('is_arsip', false))
             ->actions([
                 Tables\Actions\EditAction::make()->iconButton()->label('Ubah'),
-                // Hapus dengan ikon sampah saja
-                Tables\Actions\DeleteAction::make()->iconButton()->label('Hapus'),
+                
+                // 🛠️ REFORMASI TOMBOL HAPUS & PENGARSIPAN DINAMIS
+                Tables\Actions\DeleteAction::make()
+                    ->iconButton()
+                    ->label('Hapus')
+                    ->modalHeading('Konfirmasi Penghapusan / Pengarsipan Pasien')
+                    ->modalSubmitActionLabel('Proses Data')
+                    ->form([
+                        // 1. Pilihan Alasan Utama
+                        Forms\Components\Select::make('alasan_hapus')
+                            ->label('Alasan Penghapusan Data')
+                            ->options([
+                                'salah_input' => 'Salah Input (Hapus Permanen)',
+                                'pindah' => 'Balita Pindah Domisili / Puskesmas',
+                                'meninggal' => 'Balita Meninggal Dunia',
+                            ])
+                            ->required()
+                            ->live(),
+
+                        // 2. Form Tambahan: PINDAH DOMISILI / PUSKESMAS
+                        Forms\Components\Textarea::make('keterangan_pindah')
+                            ->label('Keterangan Pindah Puskesmas / Domisili')
+                            ->placeholder('Masukkan lokasi puskesmas baru atau alamat domisili baru...')
+                            ->required()
+                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'pindah'),
+
+                        // 3. Form Tambahan: MENINGGAL DUNIA
+                        Forms\Components\DatePicker::make('tgl_meninggal')
+                            ->label('Tanggal Meninggal')
+                            ->required()
+                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'meninggal'),
+
+                        Forms\Components\TextInput::make('penyebab_meninggal')
+                            ->label('Penyebab Meninggal')
+                            ->required()
+                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'meninggal'),
+
+                        Forms\Components\TextInput::make('tempat_pemakaman')
+                            ->label('Tempat Pemakaman')
+                            ->required()
+                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'meninggal'),
+                    ])
+                    ->action(function (array $data, $record) {
+                        if ($data['alasan_hapus'] === 'salah_input') {
+                            // JALUR 1: Hapus Permanen dari Database
+                            $record->delete();
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Data Dihapus Permanen')
+                                ->body('Data pasien berhasil dihapus secara permanen karena salah input.')
+                                ->success()
+                                ->send();
+                        } else {
+                            // JALUR 2 & 3: Masuk ke Sistem Arsip (is_arsip = true)
+                            $record->update([
+                                'is_arsip' => true,
+                                'keterangan_pindah' => $data['keterangan_pindah'] ?? null,
+                                'tgl_meninggal' => $data['tgl_meninggal'] ?? null,
+                                'penyebab_meninggal' => $data['penyebab_meninggal'] ?? null,
+                                'tempat_pemakaman' => $data['tempat_pemakaman'] ?? null,
+                            ]);
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Data Berhasil Diarsipkan')
+                                ->body('Pasien telah dipindahkan ke daftar arsip dan dikeluarkan dari daftar aktif.')
+                                ->success()
+                                ->send();
+                        }
+                    }),
             ])
-            // Menghapus Bulk Action (Checkbox di kiri)
             ->bulkActions([]);
     }
 
@@ -139,16 +211,17 @@ class PasienResource extends Resource
             'index' => Pages\ListPasiens::route('/'),
             'create' => Pages\CreatePasien::route('/create'),
             'edit' => Pages\EditPasien::route('/{record}/edit'),
+            'arsip' => Pages\ArsipPasien::route('/arsip'),
         ];
     }
 
-    // --- LOGIKA AGAR SUPER ADMIN TIDAK TERKUNCI ---
+    // --- LOGIKA HAK AKSES MENU ---
     public static function shouldRegisterNavigation(): bool
-{
-    if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
-        return true;
+    {
+        if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
+            return true;
+        }
+        $akses = Auth::user()?->akses_menu ?? [];
+        return in_array('pasien', $akses);
     }
-    $akses = Auth::user()?->akses_menu ?? [];
-    return in_array('pasien', $akses); // Harus sama dengan kunci di UserResource
-}
 }

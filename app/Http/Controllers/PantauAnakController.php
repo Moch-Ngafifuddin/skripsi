@@ -37,7 +37,7 @@ class PantauAnakController extends Controller
     // 3. Menampilkan Laporan Lengkap (Mirip Kartu KMS)
     public function detail($id)
     {
-        // Ambil data pasien beserta riwayat pemeriksaan bayinya (diurutkan dari yang terbaru)
+        // Ambil Data Balita beserta riwayat pemeriksaan bayinya (diurutkan dari yang terbaru)
         $pasien = Pasien::with(['pemeriksaanBayi' => function($query) {
             $query->orderBy('tgl_periksa', 'desc');
         }])->findOrFail($id);

@@ -37,7 +37,7 @@
             </div>
         </a>
 
-        <!-- MENU 2: REMAJA -->
+        <!-- MENU 2: REMAJA
         <a href="{{ $urlPemeriksaanRemaja }}" class="group flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-150">
             <div class="flex items-center gap-3.5">
                 <div class="p-2.5 w-11 h-11 bg-blue-50 dark:bg-blue-950/50 rounded-lg text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -61,7 +61,7 @@
             </div>
         </a>
 
-        <!-- MENU 3: LANSIA -->
+        MENU 3: LANSIA
         <a href="{{ $urlPemeriksaanLansia }}" class="group flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-150">
             <div class="flex items-center gap-3.5">
                 <div class="p-2.5 w-11 h-11 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -83,7 +83,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                 </svg>
             </div>
-        </a>
+        </a>  -->
 
     </div>
 </x-filament-panels::page>

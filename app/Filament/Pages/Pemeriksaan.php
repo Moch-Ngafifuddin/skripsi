@@ -15,7 +15,7 @@ class Pemeriksaan extends Page
 
     protected static ?string $navigationLabel = 'Pemeriksaan';
 
-    protected ?string $heading = 'Menu Pemeriksaan Posyandu';
+    protected ?string $heading = 'Pemeriksaan Posyandu';
 
     protected static ?string $navigationGroup = 'Pelayanan';
     

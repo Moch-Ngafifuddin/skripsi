@@ -19,7 +19,7 @@ class GrafikKategoriPasien extends ChartWidget
     {
         return [
             'maintainAspectRatio' => true,
-            'aspectRatio' => 2,//pengaturan ukuran grafik donat
+            'aspectRatio' => 2,
             'plugins' => [
                 'legend' => [
                     'position' => 'bottom',

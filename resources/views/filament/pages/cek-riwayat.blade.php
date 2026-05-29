@@ -49,7 +49,7 @@
                 </table>
             </div>
         </div>
-    @endif
+    <!-- @endif
 
     {{-- ================= TAMPILKAN TABEL REMAJA (JIKA ADA DATANYA) ================= --}}
     @if($punyaDataRemaja)
@@ -113,6 +113,6 @@
                 </table>
             </div>
         </div>
-    @endif
+    @endif -->
 
 </div>

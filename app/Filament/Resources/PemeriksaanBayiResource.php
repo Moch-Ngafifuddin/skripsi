@@ -109,7 +109,7 @@ class PemeriksaanBayiResource extends Resource
                                     ])->columns(2),
                             ])
                             ->createOptionAction(function (\Filament\Forms\Components\Actions\Action $action) {
-                                return $action->modalHeading('Buat Data Pasien Baru')->modalWidth('4xl');
+                                return $action->modalHeading('Buat Data Balita Baru')->modalWidth('4xl');
                             }),
 
                         Forms\Components\DatePicker::make('tgl_periksa')

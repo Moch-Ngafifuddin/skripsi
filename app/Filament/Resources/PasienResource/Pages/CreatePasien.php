@@ -8,9 +8,9 @@ class CreatePasien extends CreateRecord
 {
     protected static string $resource = PasienResource::class;
 
-    // Tambahkan ini untuk mengubah judul "Create Pasien" menjadi "Buat Data Pasien"
+    // Tambahkan ini untuk mengubah judul "Create Pasien" menjadi "Buat Data Balita"
     public function getTitle(): string 
     {
-        return 'Buat Data Pasien';
+        return 'Buat Data Balita';
     }
 }

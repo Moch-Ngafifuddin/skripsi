@@ -97,7 +97,7 @@ class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
         $tanggalFormat = Carbon::parse($formData['tanggal_kegiatan'])->translatedFormat('l, d F Y');
         $lokasiFormat = $formData['lokasi_kegiatan'];
 
-        // Tarik data pasien
+        // Tarik Data Balita
         $query = Pasien::query();
 
         if ($kategori !== 'semua') {

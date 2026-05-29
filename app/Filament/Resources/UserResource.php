@@ -58,7 +58,7 @@ class UserResource extends Resource
                     ->schema([
                         Forms\Components\CheckboxList::make('akses_menu')
                         ->options([
-                            'pasien' => 'Data Pasien',    // Kuncinya: pasien
+                            'pasien' => 'Data Balita',    // Kuncinya: pasien
                             'bayi'   => 'Posyandu Balita', // Kuncinya: bayi
                             'remaja' => 'Posyandu Remaja', // Kuncinya: remaja
                             'lansia' => 'Posyandu Lansia', // Kuncinya: lansia

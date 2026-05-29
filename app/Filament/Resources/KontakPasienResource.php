@@ -17,11 +17,11 @@ class KontakPasienResource extends Resource
     // Menggunakan ikon buku telepon / kontak
     protected static ?string $navigationIcon = 'heroicon-o-phone';
 
-    protected static ?string $navigationLabel = 'Kontak Pasien';
+    protected static ?string $navigationLabel = 'Kontak Orang Tua';
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 2; // Berada tepat di bawah Data Pasien
+    protected static ?int $navigationSort = 2; // Berada tepat di bawah Data Balita
 
     public static function form(Form $form): Form
     {
