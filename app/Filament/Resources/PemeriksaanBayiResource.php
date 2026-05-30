@@ -60,8 +60,8 @@ class PemeriksaanBayiResource extends Resource
 
         return $form
             ->schema([
-                // --- MEJA 1: PENDAFTARAN ---
-                Forms\Components\Section::make('Data Pendaftaran (Meja 1)')
+                // --- MEJA 1: Pendaftaran Balita Baru ---
+                Forms\Components\Section::make('Data Pendaftaran Balita Baru (Meja 1)')
                     ->schema([
                         Forms\Components\Select::make('pasien_id')
                             ->relationship('pasien', 'nama')

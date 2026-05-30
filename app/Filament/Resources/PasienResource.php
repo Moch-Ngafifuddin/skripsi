@@ -211,7 +211,6 @@ class PasienResource extends Resource
             'index' => Pages\ListPasiens::route('/'),
             'create' => Pages\CreatePasien::route('/create'),
             'edit' => Pages\EditPasien::route('/{record}/edit'),
-            'arsip' => Pages\ArsipPasien::route('/arsip'),
         ];
     }
 

@@ -6,11 +6,11 @@
         </svg>
         <span class="text-gray-600 dark:text-gray-300">Meja Tugas Aktif:</span>
         <span class="font-bold text-primary-600 dark:text-primary-400">
-            {{ $mejaTugas == '1' ? 'Meja 1 (Pendaftaran)' : 'Meja ' . $mejaTugas }}
+            {{ $mejaTugas == '1' ? 'Meja 1 (Pendaftaran Balita Baru)' : 'Meja ' . $mejaTugas }}
         </span>
     </div>
 
-    <!-- Grid Menu Pendaftaran - Desain Menyamping Slim -->
+    <!-- Grid Menu Pendaftaran Balita Baru - Desain Menyamping Slim -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-1">
         
         <!-- MENU 1: BALITA -->
@@ -23,7 +23,7 @@
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">
-                        Pendaftaran Balita
+                        Pendaftaran Balita Baru Balita
                     </h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         Registrasi Bayi & Balita baru
@@ -47,7 +47,7 @@
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">
-                        Pendaftaran Remaja
+                        Pendaftaran Balita Baru Remaja
                     </h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         Registrasi usia remaja
@@ -71,7 +71,7 @@
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">
-                        Pendaftaran Lansia
+                        Pendaftaran Balita Baru Lansia
                     </h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         Registrasi Lanjut Usia (PTM)

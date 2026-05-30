@@ -12,16 +12,16 @@ class Pendaftaran extends Page
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
     // Judul Menu di Sidebar
-    protected static ?string $navigationLabel = 'Pendaftaran';
+    protected static ?string $navigationLabel = 'Pendaftaran Balita Baru';
 
     // Judul Halaman Utama
-    protected ?string $heading = 'Pendaftaran Posyandu';
+    protected ?string $heading = 'Pendaftaran Balita Baru Posyandu';
 
     // Kelompok menu di sidebar
     protected static ?string $navigationGroup = 'Pelayanan';
     protected static ?int $navigationSort = 1;
 
-    protected static string $view = 'filament.pages.pendaftaran';
+    protected static string $view = 'filament.pages.Pendaftaran Balita Baru';
 
     public function getViewData(): array
     {

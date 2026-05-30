@@ -21,7 +21,7 @@ class KontakPasienResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 2; // Berada tepat di bawah Data Balita
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -31,7 +31,7 @@ class KontakPasienResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('nama')
                             ->label('Nama Pasien')
-                            ->disabled(), // Dikunci agar tidak sengaja terubah di menu ini
+                            ->disabled(), 
 
                         Forms\Components\TextInput::make('no_hp')
                             ->label('Nomor WhatsApp (Aktif)')
@@ -52,11 +52,11 @@ class KontakPasienResource extends Resource
                 ->sortable()
                 ->weight('bold'),
 
-            // SEBELUMNYA KOSONG, SEKARANG KITA JADIKAN DINAMIS BERDASARKAN RELASI
+            
             Tables\Columns\TextColumn::make('kategori')
                 ->label('Kategori')
                 ->state(function ($record): string {
-                    // Sistem akan mengecek otomatis pasien ini punya riwayat di tabel mana
+                    
                     if ($record->pemeriksaanBayi()->exists()) {
                         return 'Balita';
                     }
@@ -76,7 +76,6 @@ class KontakPasienResource extends Resource
                     default => 'gray',
                 }),
 
-            // Kolom edit nomor HP langsung ala excel
             Tables\Columns\TextInputColumn::make('no_hp')
                 ->label('Nomor WhatsApp (Klik untuk Edit)')
                 ->searchable()

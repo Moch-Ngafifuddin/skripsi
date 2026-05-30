@@ -18,10 +18,7 @@ class UserResource extends Resource
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
-    
-    // Kita buat Group Menu baru bernama "Pengaturan" agar terpisah dari data Posyandu
     protected static ?string $navigationGroup = 'Pengaturan';
-    
     protected static ?string $navigationLabel = 'Manajemen Akun';
     protected static ?string $pluralModelLabel = 'Manajemen Akun';
 
@@ -44,7 +41,7 @@ class UserResource extends Resource
                             ->label('Posisi / Meja Tugas')
                             ->options([
                                 'superadmin' => '⭐ Super Admin (Akses Penuh)',
-                                'meja_1' => 'Meja 1 (Pendaftaran)',
+                                'meja_1' => 'Meja 1 (Pendaftaran Balita Baru)',
                                 'meja_2' => 'Meja 2 (Tinggi Badan / Fisik)',
                                 'meja_3' => 'Meja 3 (Lingkar Kepala / LILA)',
                                 'meja_4' => 'Meja 4 (Berat Badan)',
@@ -67,6 +64,62 @@ class UserResource extends Resource
                             ->columns(2) // Tampil 2 kolom biar rapi
                             ->gridDirection('row'),
                     ]),
+                
+                    Forms\Components\Section::make('Konfigurasi Wilayah Kerja & Pelayanan')
+                    ->description('Data ini akan digunakan secara otomatis sebagai identitas wilayah pada rekam medis dan menu Cek Riwayat.')
+                    ->icon('heroicon-o-map-pin')
+                    ->schema([
+                        
+                        // --- BARIS 1: PROVINSI & KABUPATEN ---
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('provinsi')
+                                    ->label('Provinsi')
+                                    ->placeholder('Contoh: JAWA TENGAH')
+                                    ->required()
+                                    ->maxLength(100),
+    
+                                Forms\Components\TextInput::make('kabupaten_kota')
+                                    ->label('Kabupaten / Kota')
+                                    ->placeholder('Contoh: KABUPATEN BANYUMAS')
+                                    ->required()
+                                    ->maxLength(100),
+                            ]),
+    
+                        // --- BARIS 2: KECAMATAN & DESA ---
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('kecamatan')
+                                    ->label('Kecamatan')
+                                    ->placeholder('Contoh: KEMBARAN')
+                                    ->required()
+                                    ->maxLength(100),
+    
+                                Forms\Components\TextInput::make('desa_kelurahan')
+                                    ->label('Desa / Kelurahan')
+                                    ->placeholder('Contoh: TAMBAKSARI KIDUL')
+                                    ->required()
+                                    ->maxLength(100),
+                            ]),
+    
+                        // --- BARIS 3: PUSKESMAS & POSYANDU ---
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('nama_puskesmas')
+                                    ->label('Nama Puskesmas')
+                                    ->placeholder('Contoh: KEMBARAN I')
+                                    ->required()
+                                    ->maxLength(100),
+    
+                                Forms\Components\TextInput::make('nama_posyandu')
+                                    ->label('Nama Posyandu')
+                                    ->placeholder('Contoh: ANYELIR')
+                                    ->required()
+                                    ->maxLength(100),
+                            ]),
+    
+                    ])
+                    ->collapsible(),
             ]);
     }
 

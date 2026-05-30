@@ -13,13 +13,13 @@ class Pemeriksaan extends Page
     // Menggunakan ikon aktivitas/kesehatan
     protected static ?string $navigationIcon = 'heroicon-o-heart';
 
-    protected static ?string $navigationLabel = 'Pemeriksaan';
+    protected static ?string $navigationLabel = 'Pemeriksaan Balita';
 
     protected ?string $heading = 'Pemeriksaan Posyandu';
 
     protected static ?string $navigationGroup = 'Pelayanan';
     
-    // Urutan kedua setelah menu Pendaftaran
+    // Urutan kedua setelah menu Pendaftaran Balita Baru
     protected static ?int $navigationSort = 2; 
 
     protected static string $view = 'filament.pages.pemeriksaan';

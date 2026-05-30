@@ -6,7 +6,7 @@
         </svg>
         <span class="text-gray-600 dark:text-gray-300">Meja Tugas Aktif:</span>
         <span class="font-bold text-primary-600 dark:text-primary-400">
-            {{ $mejaTugas == '1' ? 'Meja 1 (Pendaftaran)' : 'Meja ' . $mejaTugas }}
+            {{ $mejaTugas == '1' ? 'Meja 1 (Pendaftaran Balita Baru)' : 'Meja ' . $mejaTugas }}
         </span>
     </div>
 

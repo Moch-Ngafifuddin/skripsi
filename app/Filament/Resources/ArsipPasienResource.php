@@ -1,28 +1,39 @@
 <?php
 
-namespace App\Filament\Resources\PasienResource\Pages; // 👈 1. Perubahan namespace ke folder Pages Resource
+namespace App\Filament\Resources;
 
-use App\Filament\Resources\PasienResource;
-use Filament\Resources\Pages\ListRecords;
-use Filament\Tables\Table;
+use App\Filament\Resources\ArsipPasienResource\Pages;
+use App\Models\Pasien; // Tetap menggunakan model Pasien yang sama
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
 use Filament\Tables;
-use App\Models\Pasien;
+use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 
-class ArsipPasien extends ListRecords // 👈 2. Menggunakan ListRecords murni tanpa perlu import trait manual
+class ArsipPasienResource extends Resource
 {
-    protected static string $resource = PasienResource::class;
+    protected static ?string $model = Pasien::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
     protected static ?string $navigationLabel = 'Arsip Pasien';
-    protected static ?string $title = 'Arsip Data Balita';
+    protected static ?string $pluralModelLabel = 'Arsip Pasien';
+    protected static ?string $modelLabel = 'Arsip Pasien';
+    
+    // 🛠️ LANGSUNG DIKUNCI KE KELOMPOK PELAYANAN
     protected static ?string $navigationGroup = 'Pelayanan';
     protected static ?int $navigationSort = 5;
 
-    public function table(Table $table): Table
+    public static function form(Form $form): Form
+    {
+        return $form->schema([]); // Kosongkan karena di arsip tidak ada input data baru
+    }
+
+    public static function table(Table $table): Table
     {
         return $table
-            ->query(Pasien::query()->where('is_arsip', true)) // Hanya mengambil data yang diarsipkan
+            // KUNCI UTAMA: Hanya mengambil data pasien yang sudah diarsipkan
+            ->modifyQueryUsing(fn ($query) => $query->where('is_arsip', true))
             ->columns([
                 Tables\Columns\TextColumn::make('nik')
                     ->label('NIK')
@@ -62,6 +73,7 @@ class ArsipPasien extends ListRecords // 👈 2. Menggunakan ListRecords murni t
                     }),
             ])
             ->actions([
+                // Tombol Pulihkan
                 Tables\Actions\Action::make('pulihkan')
                     ->label('Pulihkan')
                     ->icon('heroicon-o-arrow-path')
@@ -88,12 +100,15 @@ class ArsipPasien extends ListRecords // 👈 2. Menggunakan ListRecords murni t
             ->bulkActions([]);
     }
 
-    protected function getHeaderActions(): array
+    public static function getPages(): array
     {
-        return [];
+        return [
+            'index' => Pages\ManageArsipPasiens::route('/'),
+        ];
     }
 
-    public static function shouldRegisterNavigation(array $parameters = []): bool
+    // --- HAK AKSES MENU ---
+    public static function shouldRegisterNavigation(): bool
     {
         if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
             return true;
@@ -101,23 +116,4 @@ class ArsipPasien extends ListRecords // 👈 2. Menggunakan ListRecords murni t
         $akses = Auth::user()?->akses_menu ?? [];
         return in_array('pasien', $akses);
     }
-
-    public static function getNavigationItems(array $parameters = []): array
-    {
-
-        if (! static::shouldRegisterNavigation($parameters)) {
-            return [];
-        }
-
-        return [
-            \Filament\Navigation\NavigationItem::make(static::getNavigationLabel())
-                ->group(static::getNavigationGroup())
-                ->icon(static::getNavigationIcon())
-                ->activeIcon(static::getNavigationIcon())
-                ->isActiveWhen(fn () => request()->routeIs(static::getRouteName()))
-                ->sort(static::getNavigationSort())
-                ->url(static::getUrl()),
-        ];
-    }
-
 }
