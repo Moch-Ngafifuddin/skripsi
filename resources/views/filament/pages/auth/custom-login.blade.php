@@ -22,14 +22,15 @@
     @endif
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght=300;400;500;600;700;800&display=swap');
+        /* 🛠️ PERBAIKAN IMPORT FONT POPPINS AGAR LEBIH SEMPURNA */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
         :root {
             --primary: {{ $warna_tema }};
         }
 
         * {
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', sans-serif !important;
         }
 
         .hide-scroll::-webkit-scrollbar {
@@ -52,6 +53,7 @@
             min-height: 46px !important;
             font-weight: 600 !important;
             transition: all .2s ease-in-out;
+            font-family: 'Poppins', sans-serif !important;
         }
 
         .fi-btn-primary:hover {
@@ -63,6 +65,7 @@
             border-radius: 14px !important;
             min-height: 46px !important;
             background-color: rgba(255, 255, 255, 0.6) !important;
+            font-family: 'Poppins', sans-serif !important;
         }
 
         .logo-item img {
@@ -107,15 +110,11 @@
             </div>
         @endif
 
-        {{-- Header Teks --}}
-        <div class="text-center mb-6 xl:mb-8">
-            <h2 class="text-2xl xl:text-3xl font-extrabold text-slate-900 tracking-tight">
-                LOGIN AKUN
-            </h2>
-
-            <p class="text-slate-700 text-xs xl:text-sm mt-2 font-semibold leading-relaxed">
+        {{-- 🛠️ PERBAIKAN HEADER: Tulisan "LOGIN AKUN" Dihapus, Teks Selamat Datang Diperbesar Proporsional --}}
+        <div class="text-center mb-6 xl:mb-8 px-2">
+            <h2 class="text-lg sm:text-xl xl:text-2xl font-bold text-slate-800 leading-snug tracking-tight">
                 {{ $teks_login ?? 'Masuk menggunakan kredensial petugas yang valid.' }}
-            </p>
+            </h2>
         </div>
 
         {{-- Form Login --}}

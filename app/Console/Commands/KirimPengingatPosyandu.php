@@ -3,60 +3,42 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use App\Models\JadwalPosyandu;
 use App\Models\Pasien;
-use App\Services\FonnteService;
+use App\Services\LayananFonnte;
+use Carbon\Carbon;
 
 class KirimPengingatPosyandu extends Command
 {
-    // Nama perintah yang akan dijalankan oleh sistem cron job
-    protected $signature = 'posyandu:kirim-pengingat';
-    protected $description = 'Mengecek jadwal posyandu hari ini dan mengirimkan WA pengingat otomatis via Fonnte';
+
+    protected $signature = 'posyandu:kirim-reminder';
+    protected $description = 'Mengirim pesan WA pengingat otomatis H-1 acara kepada masyarakat berdasarkan kategori target';
 
     public function handle()
     {
-        $hariIni = now()->toDateString();
-        $jadwal = DB::table('jadwal_posyandu')->where('tanggal_kegiatan', $hariIni)->first();
 
-        if (!$jadwal) {
-            $this->info('Tidak ada jadwal posyandu untuk hari ini.');
-            return 0;
-        }
+        $besok = Carbon::tomorrow()->toDateString();
+        
+        $jadwals = JadwalPosyandu::where('tanggal_acara', $besok)
+            ->where('is_aktif', 1) 
+            ->get();
 
+        foreach ($jadwals ?? [] as $jadwal) {
 
-        $query = Pasien::query();
-
-        if ($jadwal->kategori_target !== 'semua') {
+            $pasiens = [];
             if ($jadwal->kategori_target === 'balita') {
-                $query->whereHas('pemeriksaanBayi');
-            } elseif ($jadwal->kategori_target === 'remaja') {
-                $query->whereHas('pemeriksaanRemaja');
-            } elseif ($jadwal->kategori_target === 'lansia') {
-                $query->whereHas('pemeriksaanLansia');
+                $pasiens = Pasien::where('is_arsip', 0)->get();
+            }
+
+            foreach ($pasiens ?? [] as $pasien) {
+                if (empty($pasien->no_hp)) continue;
+
+                $pesanFinal = str_replace('{nama}', $pasien->nama, $jadwal->isi_pesan);
+
+                LayananFonnte::kirimPesan($pasien->no_hp, $pesanFinal);
             }
         }
 
-        $nomorHp = $query->whereNotNull('no_hp')->where('no_hp', '!=', '')->pluck('no_hp')->toArray();
-
-        if (count($nomorHp) === 0) {
-            $this->warn('Ada jadwal, tetapi tidak ada nomor HP sasaran di database.');
-            return 0;
-        }
-
-        // 3. Susun Template Pesan Otomatis
-        $pesanTemplate = "📢 *PENGINGAT KEGIATAN POSYANDU* 📢\n\n" .
-                         "Halo Bapak/Ibu/Saudara,\n" .
-                         "Mengingatkan bahwa HARI INI akan dilaksanakan kegiatan: *{$jadwal->nama_kegiatan}*.\n\n" .
-                         "📅 Tanggal: " . now()->format('d M Y') . "\n" .
-                         "⏰ Waktu: 08:00 WIB s/d Selesai\n\n" .
-                         "Mohon kehadirannya dengan membawa berkas/buku KIA/KMS yang diperlukan. Terima kasih.";
-
-        $targetBlast = implode(',', $nomorHp);
-
-        // 4. Kirim otomatis via Fonnte
-        FonnteService::kirimPesan($targetBlast, $pesanTemplate);
-        
-        $this->info('Pesan otomatis jadwal posyandu berhasil dikirim ke ' . count($nomorHp) . ' target.');
-        return 0;
+        $this->info('Proses otomatisasi reminder H-1 selesai disiarkan.');
     }
 }

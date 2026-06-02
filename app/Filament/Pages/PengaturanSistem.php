@@ -46,6 +46,7 @@ class PengaturanSistem extends Page
                         Textarea::make('teks_login')
                             ->label('Teks Selamat Datang di Halaman Login')
                             ->rows(3)
+                            ->helperText('Teks ini akan menjadi judul utama halaman login menggantikan tulisan LOGIN AKUN.') 
                             ->required(),
 
                         FileUpload::make('logo')

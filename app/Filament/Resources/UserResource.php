@@ -49,28 +49,37 @@ class UserResource extends Resource
                             ])
                             ->required(),
 
-                // --- BAGIAN BARU: PENGATURAN HAK AKSES ---
-                Forms\Components\Section::make('Hak Akses Menu')
-                    ->description('Centang menu yang boleh diakses petugas ini')
-                    ->schema([
-                        Forms\Components\CheckboxList::make('akses_menu')
-                        ->options([
-                            'pasien' => 'Data Balita',    // Kuncinya: pasien
-                            'bayi'   => 'Posyandu Balita', // Kuncinya: bayi
-                            'remaja' => 'Posyandu Remaja', // Kuncinya: remaja
-                            'lansia' => 'Posyandu Lansia', // Kuncinya: lansia
-                            'user'   => 'Manajemen Akun',  // Kuncinya: user
-                            ])
-                            ->columns(2) // Tampil 2 kolom biar rapi
-                            ->gridDirection('row'),
-                    ]),
+                            Forms\Components\Section::make('Hak Akses Menu')
+                            ->description('Centang menu yang boleh diakses petugas ini')
+                            ->schema([
+                                Forms\Components\CheckboxList::make('akses_menu')
+                                    ->options(function () {
+                                        $resources = \Filament\Facades\Filament::getResources();
+                                        
+                                        $options = [];
+                                        
+                                        foreach ($resources as $resource) {
+                                            $slug = $resource::getSlug();
+                                            
+                                            $label = $resource::getNavigationLabel();
+                                            
+                                            $options[$slug] = $label;
+                                        }
+
+                                        $options['pengaturan-sistem'] = 'Pengaturan Tampilan';
+                        
+                                        return $options;
+                                    })
+                                    ->columns(5)
+                                    ->gridDirection('row'),
+                            ]),
                 
                     Forms\Components\Section::make('Konfigurasi Wilayah Kerja & Pelayanan')
                     ->description('Data ini akan digunakan secara otomatis sebagai identitas wilayah pada rekam medis dan menu Cek Riwayat.')
                     ->icon('heroicon-o-map-pin')
                     ->schema([
                         
-                        // --- BARIS 1: PROVINSI & KABUPATEN ---
+
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\TextInput::make('provinsi')
@@ -86,7 +95,7 @@ class UserResource extends Resource
                                     ->maxLength(100),
                             ]),
     
-                        // --- BARIS 2: KECAMATAN & DESA ---
+
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\TextInput::make('kecamatan')
@@ -147,7 +156,7 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(), // Tombol Hapus Akun
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),
@@ -169,6 +178,6 @@ class UserResource extends Resource
             return true;
         }
         $akses = Auth::user()?->akses_menu ?? [];
-        return in_array('pasien', $akses); // Harus sama dengan kunci di UserResource
+        return in_array('pasien', $akses);
     }
 }

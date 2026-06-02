@@ -12,7 +12,7 @@ class GrafikGiziBalita extends ChartWidget
 
     public function getType(): string
     {
-        return 'bar'; // Tetap menggunakan grafik batang
+        return 'bar';
     }
 
     protected function getOptions(): array
@@ -24,14 +24,10 @@ class GrafikGiziBalita extends ChartWidget
                 ],
             ],
             'scales' => [
-                'x' => [
-                    'stacked' => true, // Membuat batang menumpuk ke atas agar rapi
-                ],
+                'x' => ['stacked' => true],
                 'y' => [
                     'stacked' => true,
-                    'ticks' => [
-                        'stepSize' => 1, // Skala kenaikan angka grafik per 1 anak
-                    ],
+                    'ticks' => ['stepSize' => 1],
                 ],
             ],
         ];
@@ -39,13 +35,16 @@ class GrafikGiziBalita extends ChartWidget
 
     protected function getData(): array
     {
-        // 1. Ambil rekam pemeriksaan paling terbaru dari setiap anak agar tidak double hitung
-        $pemeriksaanTerbaruIds = PemeriksaanBayi::latest('tgl_periksa')
-            ->get()
-            ->unique('pasien_id')
+        // 🚀 Ambil ID pemeriksaan terbaru via SQL Grouping
+        $pemeriksaanTerbaruIds = PemeriksaanBayi::selectRaw('MAX(id) as id')
+            ->groupBy('pasien_id')
             ->pluck('id');
 
-        // 2. Definisikan 4 Kelompok Umur Bulan berdasarkan Fase Buku KIA Kemenkes
+        // 🚀 OPTIMASI: Tarik data ringkas dari ID terpilih sekali saja ke memori Collection
+        $pemeriksaanData = PemeriksaanBayi::whereIn('id', $pemeriksaanTerbaruIds)
+            ->select('usia_bulan', 'status_gizi')
+            ->get();
+
         $kelompokUmur = [
             '0-11 Bulan'  => [0, 11],
             '12-23 Bulan' => [12, 23],
@@ -53,26 +52,20 @@ class GrafikGiziBalita extends ChartWidget
             '36-59 Bulan' => [36, 59],
         ];
 
-        // Penampung array jumlah anak untuk masing-masing baris status gizi
         $dataNormal = [];
         $dataBermasalah = [];
 
         foreach ($kelompokUmur as $label => $range) {
-            // Hitung anak yang Normal di range umur tersebut
-            $dataNormal[] = PemeriksaanBayi::whereIn('id', $pemeriksaanTerbaruIds)
-                ->whereBetween('usia_bulan', [$range[0], $range[1]])
-                ->where('status_gizi', 'Berat Badan Normal')
-                ->count();
+            // 🚀 FILTER LANGSUNG DI MEMORI RAM (Tanpa Hit Database Lagi!)
+            $filteredByAge = $pemeriksaanData->whereBetween('usia_bulan', [$range[0], $range[1]]);
 
-            // Hitung anak yang Bermasalah (Sangat Kurang / Kurang / Risiko Lebih) di range umur tersebut
-            $dataBermasalah[] = PemeriksaanBayi::whereIn('id', $pemeriksaanTerbaruIds)
-                ->whereBetween('usia_bulan', [$range[0], $range[1]])
-                ->whereIn('status_gizi', [
-                    'Berat Badan Sangat Kurang',
-                    'Berat Badan Kurang',
-                    'Risiko Berat Badan Lebih'
-                ])
-                ->count();
+            $dataNormal[] = $filteredByAge->where('status_gizi', 'Berat Badan Normal')->count();
+
+            $dataBermasalah[] = $filteredByAge->whereIn('status_gizi', [
+                'Berat Badan Sangat Kurang',
+                'Berat Badan Kurang',
+                'Risiko Berat Badan Lebih'
+            ])->count();
         }
 
         return [
@@ -80,15 +73,14 @@ class GrafikGiziBalita extends ChartWidget
                 [
                     'label' => 'BB Normal / Ideal',
                     'data' => $dataNormal,
-                    'backgroundColor' => '#34d399', // Warna Hijau Sehat
+                    'backgroundColor' => '#34d399',
                 ],
                 [
                     'label' => 'BB Bermasalah (Kurang/Sangat Kurang/Lebih)',
                     'data' => $dataBermasalah,
-                    'backgroundColor' => '#f87171', // Warna Merah Peringatan
+                    'backgroundColor' => '#f87171',
                 ],
             ],
-            // Label bawah grafik diganti mutlak menjadi kelompok umur bulan anak
             'labels' => array_keys($kelompokUmur),
         ];
     }
