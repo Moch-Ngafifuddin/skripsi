@@ -7,26 +7,35 @@ use Illuminate\Support\Facades\Log;
 
 class LayananFonnte
 {
-
     public static function kirimPesan($target, $pesan)
     {
-        $token = env('FONNTE_TOKEN');
+        // Aman dari efek buruk config:cache produksi
+        $token = config('services.fonnte.token');
 
         if (!$token) {
-            Log::error('Fonnte Token belum diatur di file .env');
+            Log::error('Fonnte Token belum diatur di file config/services.php atau .env');
             return false;
         }
 
-        $response = Http::withHeaders([
-            'Authorization' => $token,
-        ])
-        ->withoutVerifying()
-        ->post('https://api.fonnte.com/send', [
-            'target' => $target,
-            'message' => $pesan,
-            'delay' => '5',
-        ]);
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $token,
+            ])
+            // ->withoutVerifying() // Aktifkan hanya jika di localhost bermasalah dengan SSL
+            ->post('https://api.fonnte.com/send', [
+                'target' => $target,
+                'message' => $pesan,
+                'delay' => '5',
+            ]);
 
-        return $response->json();
+            if ($response->failed()) {
+                Log::warning('Fonnte API merespon dengan eror: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('Gagal menghubungi API Fonnte: ' . $e->getMessage());
+            return false;
+        }
     }
 }

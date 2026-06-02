@@ -28,7 +28,6 @@ class PengaturanSistem extends Page
 
     public function mount(): void
     {
-        // Ambil data ID 1, jika belum ada otomatis buat data awal (default)
         $pengaturan = Pengaturan::firstOrCreate(['id' => 1]);
         $this->form->fill($pengaturan->toArray());
     }
@@ -50,24 +49,48 @@ class PengaturanSistem extends Page
                             ->required(),
 
                         FileUpload::make('logo')
-                            ->label('Upload Logo Puskesmas Utama (Muncul di atas form login)')
+                            ->label('Upload Logo Puskesmas Utama (Muncul di Pojok Kiri Atas / Sidebar Panel)')
                             ->image()
                             ->directory('branding-logo'),
+
+
+                        Select::make('tinggi_logo_utama')
+                            ->label('Ukuran Tinggi Logo Utama di Sidebar')
+                            ->options([
+                                '2rem' => 'Kecil (32px)',
+                                '2.5rem' => 'Sedang (40px)',
+                                '3rem' => 'Besar (48px)',
+                                '3.5rem' => 'Sangat Besar (56px)',
+                            ])
+                            ->default('2.5rem')
+                            ->required(),
+
+
+                        Select::make('posisi_form_login')
+                            ->label('Tata Letak Kotak Form Login')
+                            ->helperText('Sesuaikan posisi kotak agar tidak menutupi objek gambar latar belakang.')
+                            ->options([
+                                'kiri' => 'Sebelah Kiri Screen',
+                                'tengah' => 'Tepat di Tengah-Tengah',
+                                'kanan' => 'Sebelah Kanan Screen',
+                            ])
+                            ->default('tengah')
+                            ->required(),
 
                         FileUpload::make('background_login')
                             ->label('Upload Gambar Latar Belakang (Background Login)')
                             ->image()
                             ->imageEditor()
-                            ->directory('branding-bg'),
-
+                            ->directory('branding-bg')
+                            ->maxSize(10240), 
+                            
                         ColorPicker::make('warna_tema')
                             ->label('Warna Utama Aplikasi (Theme Color)')
                             ->required(),
                     ]),
 
-                // SECTION 2: Multi-Logo dengan Repeater dan Sizing Dinamis
                 Section::make('Pengaturan Multi Logo Halaman Login')
-                    ->description('Tambahkan satu atau beberapa logo instansi pendukung yang akan ditampilkan di atas judul login.')
+                    ->description('Tambahkan satu atau several logo instansi pendukung yang akan ditampilkan di atas judul login.')
                     ->schema([
                         Repeater::make('logos')
                             ->label('Daftar Logo Instansi Tambahan')
@@ -93,13 +116,12 @@ class PengaturanSistem extends Page
                             ])
                             ->columns(2)
                             ->createItemButtonLabel('Tambah Logo Baru')
-                            ->grid(2), // 🛠️ PENYESUAIAN: Tanda koma dipastikan berada di sini untuk memisahkan antar-komponen form
+                            ->grid(2),
                     ]),
             ])
             ->statePath('data');
     }
 
-    // 1. 🛠️ Hapus tulisan ': void' di sini
     public function simpan(): void
     {
         $formData = $this->form->getState();
@@ -107,14 +129,12 @@ class PengaturanSistem extends Page
         $pengaturan = Pengaturan::find(1);
         $pengaturan->update($formData);
 
-        // Memuat ulang data secara diam-diam ke dalam form agar loading FilePond langsung berhenti
         $this->form->fill($pengaturan->fresh()->toArray());
 
         Notification::make()
             ->title('Logo Tersimpan')
-            ->body('Perubahan berhasil diterapkan ke halaman login.')
+            ->body('Perubahan berhasil diterapkan ke sistem.')
             ->success()
-            // ⏳ Mengatur agar popup notifikasi otomatis hilang persis dalam waktu 2 detik
             ->duration(2000) 
             ->send();
     }

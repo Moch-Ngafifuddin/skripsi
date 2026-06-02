@@ -4,38 +4,40 @@ namespace App\Helpers;
 
 use App\Models\MasterBbu;
 use App\Models\MasterTbu;
-use App\Models\MasterBbtb;
 
 class AntropometriHelper
 {
-    /**
-     * Hitung Rumus Baku Z-Score Kemenkes / WHO
-     */
+    // Wadah penampung data di memori (biar query database cuma 1 kali saja)
+    private static $bbuCache = null;
+    private static $tbuCache = null;
+
     private static function hitungZScore($nilaiRiil, $master)
     {
         if (!$master) return null;
-
         $median = $master->median;
 
-        if ($nilaiRiil == $median) {
-            return 0;
-        } elseif ($nilaiRiil > $median) {
-            // Jika nilai anak di atas median, pembaginya adalah (+1 SD - Median)
-            return ($nilaiRiil - $median) / ($master->plus_1_sd - $median);
+        if ($nilaiRiil == $median) return 0;
+        
+        if ($nilaiRiil > $median) {
+            $pembagi = $master->plus_1_sd - $median;
+            return $pembagi != 0 ? ($nilaiRiil - $median) / $pembagi : 0;
         } else {
-            // Jika nilai anak di bawah median, pembaginya adalah (Median - -1 SD)
-            return ($nilaiRiil - $median) / ($median - $master->minus_1_sd);
+            $pembagi = $median - $master->minus_1_sd;
+            return $pembagi != 0 ? ($nilaiRiil - $median) / $pembagi : 0;
         }
     }
 
-    /**
-     * 1. Klasifikasi BB/U (Status Berat Badan)
-     */
     public static function hitungBbu($jk, $umurBulan, $bb)
     {
         if (is_null($bb) || is_null($umurBulan)) return null;
 
-        $master = MasterBbu::where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
+        // Jika cache kosong, ambil semua data master sekaligus
+        if (self::$bbuCache === null) {
+            self::$bbuCache = MasterBbu::all();
+        }
+
+        // Cari data menggunakan Collection PHP (Bukan Query SQL Baru!)
+        $master = self::$bbuCache->where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
         $zscore = self::hitungZScore($bb, $master);
 
         if (is_null($zscore)) return 'Data Master Tidak Ditemukan';
@@ -46,14 +48,17 @@ class AntropometriHelper
         return 'Risiko Berat Badan Lebih';
     }
 
-    /**
-     * 2. Klasifikasi TB/U atau PB/U (Status Stunting)
-     */
     public static function hitungTbu($jk, $umurBulan, $tb)
     {
         if (is_null($tb) || is_null($umurBulan)) return null;
 
-        $master = MasterTbu::where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
+        // Jika cache kosong, ambil semua data master sekaligus
+        if (self::$tbuCache === null) {
+            self::$tbuCache = MasterTbu::all();
+        }
+
+        // Cari data menggunakan Collection PHP (Bukan Query SQL Baru!)
+        $master = self::$tbuCache->where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
         $zscore = self::hitungZScore($tb, $master);
 
         if (is_null($zscore)) return 'Data Master Tidak Ditemukan';

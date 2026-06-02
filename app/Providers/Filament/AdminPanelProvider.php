@@ -24,13 +24,13 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        // Ambil data pengaturan baris pertama dari database
+
         $pengaturan = Pengaturan::first();
-        
-        // Cek jika ada logo di database, arahkan ke path storage asset
         $logoUrl = $pengaturan?->logo ? asset('storage/' . $pengaturan->logo) : null;
         $namaPuskesmas = $pengaturan?->nama_puskesmas ?? 'Sistem Informasi Posyandu';
-        $warnaHex = $pengaturan?->warna_tema ?? '#ec4899';
+        $warnaHex = $pengaturan?->warna_tema ?? '#10b981';
+
+        $tinggiLogoUtama = $pengaturan?->tinggi_logo_utama ?? '2.5rem'; 
 
         return $panel
             ->default()
@@ -42,7 +42,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->brandName($namaPuskesmas)
             ->brandLogo($logoUrl)
-            ->brandLogoHeight('3rem')
+            ->brandLogoHeight($tinggiLogoUtama)
             ->databaseNotifications()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')

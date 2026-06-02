@@ -15,6 +15,8 @@ class Pengaturan extends Model
         'warna_tema',
         'logos',
         'background_login',
+        'tinggi_logo_utama',
+        'posisi_form_login',
     ];
     
     protected $casts = [
