@@ -91,16 +91,31 @@ class RiwayatResource extends Resource
                     ->state(fn () => auth()->user()?->nama_posyandu ?? '-'),
             ])
             ->actions([
-                // Tombol aksi bawaan / kustom diletakkan di kolom Tindakan secara otomatis
                 Tables\Actions\Action::make('lihat_riwayat')
-                    ->label('Riwayat')
+                    ->label('Riwayat Tabel')
                     ->icon('heroicon-m-clock')
                     ->color('info')
-                    ->iconButton() // Mengubah tombol menjadi lingkaran ikon murni agar hemat ruang seperti di foto
-                    ->modalHeading(fn (Pasien $record) => "Riwayat Pemeriksaan: {$record->nama}")
+                    ->iconButton()
+                    ->modalHeading(fn (Pasien $record) => "Tabel Riwayat Pemeriksaan: {$record->nama}")
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Tutup')
-                    ->modalContent(fn (Pasien $record) => view('filament.pages.cek-riwayat', ['pasien' => $record])),
+                    ->modalContent(fn (Pasien $record) => view('filament.pages.cek-riwayat', [
+                        'pasien' => $record
+                    ])),
+
+                Tables\Actions\Action::make('lihat_kms')
+                    ->label('Grafik KMS')
+                    ->icon('heroicon-o-book-open')
+                    ->color('success')
+                    ->iconButton()
+                    ->modalHeading(fn (Pasien $record) => "Kurva KMS Pertumbuhan: {$record->nama}")
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup')
+                    ->modalWidth('4xl') // Atur modal agak lebar agar grafik terlihat jelas dan rapi
+                    // Memanggil view baru khusus grafik KMS
+                    ->modalContent(fn (Pasien $record) => view('filament.pages.kms-grafik-layout', [
+                        'pasien' => $record
+                    ])),
             ])
             ->bulkActions([]);
     }

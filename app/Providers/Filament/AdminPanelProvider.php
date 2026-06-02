@@ -36,12 +36,12 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login(CustomLogin::class) // 👈 GANTI LOGIN BIASA MENJADI CUSTOM LOGIN KITA
+            ->login(CustomLogin::class)
             ->colors([
-                'primary' => $warnaHex, // 👈 WARNA TEMA JADI DINAMIS DARI DATABASE
+                'primary' => $warnaHex,
             ])
-            ->brandName($namaPuskesmas) // 👈 NAMA DI ATAS LOGO JADI DINAMIS
-            ->brandLogo($logoUrl) // 👈 LOGO JADI DINAMIS
+            ->brandName($namaPuskesmas)
+            ->brandLogo($logoUrl)
             ->brandLogoHeight('3rem')
             ->databaseNotifications()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')

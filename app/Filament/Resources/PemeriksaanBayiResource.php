@@ -191,7 +191,7 @@ class PemeriksaanBayiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-        ->modifyQueryUsing(fn ($query) => $query->whereDate('created_at', now()->toDateString()))
+        //->modifyQueryUsing(fn ($query) => $query->whereDate('created_at', now()->toDateString()))
         ->columns([
             Tables\Columns\TextColumn::make('pasien.nama')
                 ->label('Nama Balita')
@@ -212,7 +212,44 @@ class PemeriksaanBayiResource extends Resource
                 Tables\Columns\IconColumn::make('pmba')->label('PMBA')->boolean(),
                 Tables\Columns\IconColumn::make('sdidtk')->label('SDIDTK')->boolean(),
             ])
-            ->poll('3s') 
+            ->poll('3s')
+            ->filters([
+                // 1. Filter untuk Status Gizi (BB/U) - Menerima lemparan link dari Dashboard
+                Tables\Filters\SelectFilter::make('status_gizi')
+                    ->label('Status Gizi')
+                    ->options([
+                        'sangat_kurang' => 'Berat Badan Sangat Kurang',
+                        'kurang' => 'Berat Badan Kurang',
+                        'normal' => 'Berat Badan Normal',
+                        'lebih' => 'Risiko Berat Badan Lebih',
+                    ])
+                    ->query(function ($query, array $data) {
+                        if ($data['value'] === 'sangat_kurang') {
+                            $query->where('status_gizi', 'Berat Badan Sangat Kurang');
+                        } elseif ($data['value'] === 'kurang') {
+                            $query->where('status_gizi', 'Berat Badan Kurang');
+                        } elseif ($data['value'] === 'normal') {
+                            $query->where('status_gizi', 'Berat Badan Normal');
+                        } elseif ($data['value'] === 'lebih') {
+                            $query->where('status_gizi', 'Risiko Berat Badan Lebih');
+                        }
+                    }),
+    
+                // 2. Filter untuk Status Stunting (TB/U) - Menerima lemparan link dari Dashboard
+                Tables\Filters\SelectFilter::make('status_stunting')
+                    ->label('Status Stunting')
+                    ->options([
+                        'stunting' => 'Stunting (Pendek / Sangat Pendek)',
+                        'normal' => 'Normal',
+                    ])
+                    ->query(function ($query, array $data) {
+                        if ($data['value'] === 'stunting') {
+                            $query->whereIn('status_stunting', ['Sangat Pendek (Severely Stunted)', 'Pendek (Stunted)']);
+                        } elseif ($data['value'] === 'normal') {
+                            $query->where('status_stunting', 'Normal');
+                        }
+                    }),
+            ]) 
             ->actions([
                 Tables\Actions\Action::make('isi_tb')
                     ->label('Isi TB')

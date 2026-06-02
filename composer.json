@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "barryvdh/laravel-dompdf": "^3.1",
         "bezhansalleh/filament-language-switch": "^3.1",
         "filament/filament": "^3.2",
         "laravel/framework": "^12.0",
@@ -82,7 +83,8 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
-        }
+        },
+        "ignore-platform-reqs": true
     },
     "minimum-stability": "stable",
     "prefer-stable": true

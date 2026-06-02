@@ -4,11 +4,13 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
 use Filament\Forms\Form;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\ColorPicker;
-use Filament\Forms\Components\Section;
 use Filament\Notifications\Notification;
 use App\Models\Pengaturan;
 
@@ -48,19 +50,56 @@ class PengaturanSistem extends Page
                             ->required(),
 
                         FileUpload::make('logo')
-                            ->label('Upload Logo Puskesmas')
+                            ->label('Upload Logo Puskesmas Utama (Muncul di atas form login)')
                             ->image()
-                            ->directory('branding-logo')
-                            ->visibility('public'),
+                            ->directory('branding-logo'),
+
+                        FileUpload::make('background_login')
+                            ->label('Upload Gambar Latar Belakang (Background Login)')
+                            ->image()
+                            ->imageEditor()
+                            ->directory('branding-bg'),
 
                         ColorPicker::make('warna_tema')
                             ->label('Warna Utama Aplikasi (Theme Color)')
                             ->required(),
-                    ])
+                    ]),
+
+                // SECTION 2: Multi-Logo dengan Repeater dan Sizing Dinamis
+                Section::make('Pengaturan Multi Logo Halaman Login')
+                    ->description('Tambahkan satu atau beberapa logo instansi pendukung yang akan ditampilkan di atas judul login.')
+                    ->schema([
+                        Repeater::make('logos')
+                            ->label('Daftar Logo Instansi Tambahan')
+                            ->schema([
+                                FileUpload::make('path_logo')
+                                    ->label('Preview Logo Instansi')
+                                    ->image()
+                                    ->directory('system-logos')
+                                    ->imagePreviewHeight('150') 
+                                    ->maxSize(2048) 
+                                    ->required(),
+                                    
+                                Select::make('tinggi_logo')
+                                    ->label('Ukuran Tinggi Logo')
+                                    ->options([
+                                        'h-12' => 'Kecil (48px)',
+                                        'h-16' => 'Sedang (64px)',
+                                        'h-20' => 'Besar (80px)',
+                                        'h-24' => 'Sangat Besar (96px)',
+                                    ])
+                                    ->default('h-16')
+                                    ->required(),
+                            ])
+                            ->columns(2)
+                            ->createItemButtonLabel('Tambah Logo Baru')
+                            ->grid(2), // 🛠️ PENYESUAIAN: Tanda koma dipastikan berada di sini untuk memisahkan antar-komponen form
+                    ]),
             ])
             ->statePath('data');
     }
 
+    // 1. 🛠️ Hapus tulisan ': void' di sini
     public function simpan(): void
     {
         $formData = $this->form->getState();
@@ -68,10 +107,15 @@ class PengaturanSistem extends Page
         $pengaturan = Pengaturan::find(1);
         $pengaturan->update($formData);
 
+        // Memuat ulang data secara diam-diam ke dalam form agar loading FilePond langsung berhenti
+        $this->form->fill($pengaturan->fresh()->toArray());
+
         Notification::make()
-            ->title('Berhasil Diperbarui')
-            ->body('Perubahan visual berhasil disimpan. Silakan muat ulang halaman untuk melihat efek warna baru.')
+            ->title('Logo Tersimpan')
+            ->body('Perubahan berhasil diterapkan ke halaman login.')
             ->success()
+            // ⏳ Mengatur agar popup notifikasi otomatis hilang persis dalam waktu 2 detik
+            ->duration(2000) 
             ->send();
     }
 }
