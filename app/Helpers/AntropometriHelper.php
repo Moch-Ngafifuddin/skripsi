@@ -4,43 +4,48 @@ namespace App\Helpers;
 
 use App\Models\MasterBbu;
 use App\Models\MasterTbu;
+use Illuminate\Support\Facades\Cache;
 
 class AntropometriHelper
 {
-    // Wadah penampung data di memori (biar query database cuma 1 kali saja)
-    private static $bbuCache = null;
-    private static $tbuCache = null;
 
     private static function hitungZScore($nilaiRiil, $master)
     {
         if (!$master) return null;
-        $median = $master->median;
+        
+        $median = (float) $master->median;
+        $nilaiRiil = (float) $nilaiRiil;
 
         if ($nilaiRiil == $median) return 0;
         
         if ($nilaiRiil > $median) {
-            $pembagi = $master->plus_1_sd - $median;
+            $pembagi = (float) $master->plus_1_sd - $median;
             return $pembagi != 0 ? ($nilaiRiil - $median) / $pembagi : 0;
         } else {
-            $pembagi = $median - $master->minus_1_sd;
+            $pembagi = $median - (float) $master->minus_1_sd;
             return $pembagi != 0 ? ($nilaiRiil - $median) / $pembagi : 0;
         }
     }
 
+
     public static function hitungBbu($jk, $umurBulan, $bb)
     {
-        if (is_null($bb) || is_null($umurBulan)) return null;
 
-        // Jika cache kosong, ambil semua data master sekaligus
-        if (self::$bbuCache === null) {
-            self::$bbuCache = MasterBbu::all();
-        }
+        if (!is_numeric($bb) || !is_numeric($umurBulan) || empty($jk)) return null;
 
-        // Cari data menggunakan Collection PHP (Bukan Query SQL Baru!)
-        $master = self::$bbuCache->where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
+        $umurBulan = (int) $umurBulan;
+
+
+        $bbuCache = Cache::rememberForever('master_bbu_all', function () {
+            return MasterBbu::all();
+        });
+
+
+        $master = $bbuCache->where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
         $zscore = self::hitungZScore($bb, $master);
 
         if (is_null($zscore)) return 'Data Master Tidak Ditemukan';
+
 
         if ($zscore < -3) return 'Berat Badan Sangat Kurang';
         if ($zscore >= -3 && $zscore < -2) return 'Berat Badan Kurang';
@@ -48,20 +53,23 @@ class AntropometriHelper
         return 'Risiko Berat Badan Lebih';
     }
 
+
     public static function hitungTbu($jk, $umurBulan, $tb)
     {
-        if (is_null($tb) || is_null($umurBulan)) return null;
 
-        // Jika cache kosong, ambil semua data master sekaligus
-        if (self::$tbuCache === null) {
-            self::$tbuCache = MasterTbu::all();
-        }
+        if (!is_numeric($tb) || !is_numeric($umurBulan) || empty($jk)) return null;
 
-        // Cari data menggunakan Collection PHP (Bukan Query SQL Baru!)
-        $master = self::$tbuCache->where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
+        $umurBulan = (int) $umurBulan;
+
+        $tbuCache = Cache::rememberForever('master_tbu_all', function () {
+            return MasterTbu::all();
+        });
+
+        $master = $tbuCache->where('jenis_kelamin', $jk)->where('umur_bulan', $umurBulan)->first();
         $zscore = self::hitungZScore($tb, $master);
 
         if (is_null($zscore)) return 'Data Master Tidak Ditemukan';
+
 
         if ($zscore < -3) return 'Sangat Pendek (Severely Stunted)';
         if ($zscore >= -3 && $zscore < -2) return 'Pendek (Stunted)';
