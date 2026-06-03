@@ -16,10 +16,12 @@ use Illuminate\Support\Facades\Auth;
 class PemeriksaanBayiResource extends Resource
 {
     protected static ?string $model = PemeriksaanBayi::class;
+    
     public static function shouldRegisterNavigation(): bool
     {
         return false;
     }
+    
     protected static bool $shouldRegisterNavigation = false;
     protected static ?string $navigationIcon = 'heroicon-o-face-smile'; 
     protected static ?string $navigationGroup = 'Pemeriksaan';
@@ -70,7 +72,7 @@ class PemeriksaanBayiResource extends Resource
                             ->preload()
                             ->required()
                             ->live() 
-                            ->afterStateUpdated($hitungUmur) // Otomatis isi umur saat nama dipilih
+                            ->afterStateUpdated($hitungUmur)
                             ->disabled(fn () => !in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin']))
                             ->createOptionForm([
                                 Forms\Components\Section::make('Identitas Umum')
@@ -117,37 +119,52 @@ class PemeriksaanBayiResource extends Resource
                             ->default(now())
                             ->required()
                             ->live() 
-                            ->afterStateUpdated($hitungUmur) // Otomatis update umur jika tanggal mundur
+                            ->afterStateUpdated($hitungUmur)
                             ->disabled(fn () => !in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin'])),
 
-                        // --- KOLOM INPUT UMUR (DISIMPAN KE DATABASE) ---
                         Forms\Components\TextInput::make('keterangan_umur')
                             ->label('Usia Saat Diperiksa')
-                            ->disabled() // Dikunci agar kader tidak mengisi manual
-                            ->dehydrated() // Memaksa Filament menyimpan data ini ke database
+                            ->disabled() 
+                            ->dehydrated() 
                             ->required(),
                     ])->columns(3),
 
-                // --- MEJA 2: TINGGI BADAN ---
+                // --- MEJA 2: TINGGI BADAN & CARA UKUR ---
                 Forms\Components\Section::make('Data Pengukuran (Meja 2)')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_2', 'meja_5', 'superadmin'])) 
                     ->schema([
-                        Forms\Components\TextInput::make('tinggi_badan')->label('Tinggi/Panjang Badan (Cm)')->numeric(),
-                    ]),
+                        Forms\Components\TextInput::make('tinggi_badan')
+                            ->label('Tinggi/Panjang Badan (Cm)')
+                            ->numeric(),
+                        // 🟢 TAMBAHAN: Kolom Cara Ukur Kemenkes
+                        Forms\Components\Select::make('cara_ukur')
+                            ->label('Cara Ukur')
+                            ->options([
+                                'berdiri' => 'Berdiri',
+                                'terlentang' => 'Terlentang',
+                            ]),
+                    ])->columns(2),
 
                 // --- MEJA 3: LINGKAR KEPALA & LILA ---
-                Forms\Components\Section::make('Data Pengukuran (Meja 3)')
+                Forms\Components\Section::make('Data Pengukuran Tambahan (Meja 3)')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_3', 'meja_5', 'superadmin']))
                     ->schema([
-                        Forms\Components\TextInput::make('lingkar_kepala')->label('Lingkar Kepala (Cm)')->numeric(),
-                        Forms\Components\TextInput::make('lingkar_lengan')->label('Lingkar Lengan (Cm)')->numeric(),
+                        Forms\Components\TextInput::make('lingkar_kepala')
+                            ->label('Lingkar Kepala (Cm)')
+                            ->numeric(),
+                        // 🟢 PENYESUAIAN: Memakai kolom 'lila' standar database baru
+                        Forms\Components\TextInput::make('lila')
+                            ->label('Lingkar Lengan Atas / LiLA (Cm)')
+                            ->numeric(),
                     ])->columns(2),
 
                 // --- MEJA 4: BERAT BADAN ---
-                Forms\Components\Section::make('Data Pengukuran (Meja 4)')
+                Forms\Components\Section::make('Data Penimbangan (Meja 4)')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_4', 'meja_5', 'superadmin']))
                     ->schema([
-                        Forms\Components\TextInput::make('berat_badan')->label('Berat Badan (Kg)')->numeric(),
+                        Forms\Components\TextInput::make('berat_badan')
+                            ->label('Berat Badan (Kg)')
+                            ->numeric(),
                     ]),
 
                 // --- MEJA 5: PELAYANAN & EVALUASI AKHIR ---
@@ -155,27 +172,45 @@ class PemeriksaanBayiResource extends Resource
                     ->description('Hanya diisi oleh petugas Meja 5 setelah melihat data Meja 1-4')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_5', 'superadmin']))
                     ->schema([
-                        Forms\Components\Grid::make(2)
+                        Forms\Components\Grid::make(3)
                             ->schema([
-                                Forms\Components\TextInput::make('rambu_gizi')->label('Rambu Gizi (N/T/O)')->placeholder('N'),
-                                Forms\Components\TextInput::make('titik_pertumbuhan')->label('Titik Grafik (H/K/BGM)')->placeholder('H'),
+                                Forms\Components\TextInput::make('rambu_gizi')
+                                    ->label('Rambu Gizi (N/T/O)')
+                                    ->placeholder('N'),
+                                Forms\Components\TextInput::make('titik_pertumbuhan')
+                                    ->label('Titik Grafik (H/K/BGM)')
+                                    ->placeholder('H'),
+                                // 🟢 TAMBAHAN: Kolom Pitting Edema Bilateral
+                                Forms\Components\Select::make('pitting_edema')
+                                    ->label('Pitting Edema Bilateral')
+                                    ->options([
+                                        'tidak ada' => 'Tidak Ada',
+                                        'derajat +1' => 'Derajat +1',
+                                        'derajat +2' => 'Derajat +2',
+                                        'derajat +3' => 'Derajat +3',
+                                    ])
+                                    ->default('tidak ada'),
                             ]),
                             
-                        // --- TAMBAHAN TOGGLE ASI, PMBA, SDIDTK ---
-                        Forms\Components\Grid::make(5) // Ubah jadi 5 kolom agar muat sebaris
+                        // --- TOGGLE INTERVENSI & GIZI ---
+                        Forms\Components\Grid::make(4) 
                             ->schema([
                                 Forms\Components\Toggle::make('vitamin_a')->label('Vit A?')->inline(false),
                                 Forms\Components\Toggle::make('obat_cacing')->label('Obat Cacing?')->inline(false),
                                 Forms\Components\Toggle::make('asi_eksklusif')->label('ASI Eksklusif?')->inline(false),
                                 Forms\Components\Toggle::make('pmba')->label('PMBA?')->inline(false),
                                 Forms\Components\Toggle::make('sdidtk')->label('SDIDTK?')->inline(false),
+                                // 🟢 TAMBAHAN: Toggle Kelas Ibu dan Penerima MBG
+                                Forms\Components\Toggle::make('kelas_ibu')->label('Ikut Kelas Ibu?')->inline(false),
+                                Forms\Components\Toggle::make('menerima_mbg')->label('Dapat MBG?')->inline(false),
                             ]),
                             
-                        Forms\Components\TextInput::make('jenis_imunisasi')->label('Jenis Imunisasi'),
+                        Forms\Components\TextInput::make('jenis_imunisasi')
+                            ->label('Jenis Imunisasi (Jika Ada)'),
                             
                         Forms\Components\Textarea::make('catatan')
                             ->label('Catatan / KIE (Konseling)')
-                            ->placeholder('Anak sehat, lanjutkan ASI eksklusif')
+                            ->placeholder('Anak sehat, lanjutkan ASI eksklusif / Catatan intervensi...')
                             ->columnSpanFull(),
                             
                         Forms\Components\Grid::make(3)
@@ -191,13 +226,11 @@ class PemeriksaanBayiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-        //->modifyQueryUsing(fn ($query) => $query->whereDate('created_at', now()->toDateString()))
-        ->columns([
-            Tables\Columns\TextColumn::make('pasien.nama')
-                ->label('Nama Balita')
-                ->searchable(),
+            ->columns([
+                Tables\Columns\TextColumn::make('pasien.nama')
+                    ->label('Nama Balita')
+                    ->searchable(),
                 
-                // --- KOLOM KETERANGAN UMUR YANG DIAMBIL LANGSUNG DARI DATABASE ---
                 Tables\Columns\TextColumn::make('keterangan_umur')
                     ->label('Usia')
                     ->badge() 
@@ -205,16 +238,13 @@ class PemeriksaanBayiResource extends Resource
 
                 Tables\Columns\TextColumn::make('berat_badan')->label('Berat')->suffix(' Kg')->placeholder('-'),
                 Tables\Columns\TextColumn::make('tinggi_badan')->label('Tinggi')->suffix(' Cm')->placeholder('-'),
-                Tables\Columns\TextColumn::make('lingkar_kepala')->label('L. Kepala')->suffix(' Cm')->placeholder('-'),
+                Tables\Columns\TextColumn::make('lila')->label('LiLA')->suffix(' Cm')->placeholder('-'),
                 
-                // --- KOLOM INDIKATOR LAYANAN ---
-                Tables\Columns\IconColumn::make('asi_eksklusif')->label('ASI')->boolean(),
-                Tables\Columns\IconColumn::make('pmba')->label('PMBA')->boolean(),
-                Tables\Columns\IconColumn::make('sdidtk')->label('SDIDTK')->boolean(),
+                Tables\Columns\IconColumn::make('kelas_ibu')->label('Kls Ibu')->boolean(),
+                Tables\Columns\IconColumn::make('menerima_mbg')->label('MBG')->boolean(),
             ])
             ->poll('3s')
             ->filters([
-                // 1. Filter untuk Status Gizi (BB/U) - Menerima lemparan link dari Dashboard
                 Tables\Filters\SelectFilter::make('status_gizi')
                     ->label('Status Gizi')
                     ->options([
@@ -235,7 +265,6 @@ class PemeriksaanBayiResource extends Resource
                         }
                     }),
     
-                // 2. Filter untuk Status Stunting (TB/U) - Menerima lemparan link dari Dashboard
                 Tables\Filters\SelectFilter::make('status_stunting')
                     ->label('Status Stunting')
                     ->options([
@@ -258,21 +287,29 @@ class PemeriksaanBayiResource extends Resource
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_2', 'superadmin'])) 
                     ->form([
                         Forms\Components\TextInput::make('tinggi_badan')->label('Tinggi Badan (Cm)')->required()->numeric(),
+                        Forms\Components\Select::make('cara_ukur')->label('Cara Ukur')->options(['berdiri' => 'Berdiri', 'terlentang' => 'Terlentang'])->required(),
                     ])
                     ->action(function (PemeriksaanBayi $record, array $data) {
-                        $record->update(['tinggi_badan' => $data['tinggi_badan']]);
+                        $record->update([
+                            'tinggi_badan' => $data['tinggi_badan'],
+                            'cara_ukur' => $data['cara_ukur'],
+                        ]);
                     }),
 
                 Tables\Actions\Action::make('isi_lk')
-                    ->label('Isi LK')
+                    ->label('Isi LK & LiLA')
                     ->icon('heroicon-o-sparkles')
                     ->color('warning')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_3', 'superadmin'])) 
                     ->form([
                         Forms\Components\TextInput::make('lingkar_kepala')->label('Lingkar Kepala (Cm)')->required()->numeric(),
+                        Forms\Components\TextInput::make('lila')->label('LiLA (Cm)')->required()->numeric(),
                     ])
                     ->action(function (PemeriksaanBayi $record, array $data) {
-                        $record->update(['lingkar_kepala' => $data['lingkar_kepala']]);
+                        $record->update([
+                            'lingkar_kepala' => $data['lingkar_kepala'],
+                            'lila' => $data['lila'],
+                        ]);
                     }),
 
                 Tables\Actions\Action::make('isi_bb')

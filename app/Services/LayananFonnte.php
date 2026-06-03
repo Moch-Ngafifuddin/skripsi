@@ -9,7 +9,6 @@ class LayananFonnte
 {
     public static function kirimPesan($target, $pesan)
     {
-        // Aman dari efek buruk config:cache produksi
         $token = config('services.fonnte.token');
 
         if (!$token) {
@@ -17,19 +16,34 @@ class LayananFonnte
             return false;
         }
 
+
+        // 1. Hapus semua karakter yang bukan angka (spasi, tanda plus, strip, dll)
+        $targetBersih = preg_replace('/[^0-9]/', '', $target);
+        
+        // 2. Jika nomor diawali angka '0', ubah menjadi '62' (Standar Fonnte/Internasional)
+        if (substr($targetBersih, 0, 1) === '0') {
+            $targetBersih = '62' . substr($targetBersih, 1);
+        }
+
+        // Jika setelah dibersihkan nomor terlalu pendek, batalkan kirim
+        if (strlen($targetBersih) < 10) {
+            return false;
+        }
+
         try {
-            $response = Http::withHeaders([
+            //$response = Http::withHeaders([
+                $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => $token,
             ])
-            // ->withoutVerifying() // Aktifkan hanya jika di localhost bermasalah dengan SSL
             ->post('https://api.fonnte.com/send', [
-                'target' => $target,
+                'target' => $targetBersih,
                 'message' => $pesan,
-                'delay' => '5',
+                'delay' => '2', 
             ]);
 
             if ($response->failed()) {
-                Log::warning('Fonnte API merespon dengan eror: ' . $response->body());
+                Log::warning('Fonnte API merespon eror: ' . $response->body());
+                return false;
             }
 
             return $response->json();

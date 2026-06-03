@@ -7,15 +7,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Pasien extends Model
 {
-    protected $table = 'pasien'; // Nama tabel di database
-    protected $guarded = [];    // Mengizinkan penyimpanan massal (mass assignment)
+    protected $table = 'pasien'; 
+    protected $guarded = [];
 
     /**
      * Relasi ke riwayat pemeriksaan Balita
      */
-    public function pemeriksaanBayi(): HasMany 
+    public function pemeriksaanBayi()
     {
-        return $this->hasMany(PemeriksaanBayi::class, 'pasien_id');
+        return $this->hasMany(PemeriksaanBayi::class, 'pasien_id')->orderBy('id', 'desc');
     }
 
     /**

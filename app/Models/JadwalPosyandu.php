@@ -29,6 +29,8 @@ class JadwalPosyandu extends Model
         'kategori_target',
         'isi_pesan',
         'is_aktif',
+        'waktu_acara',
+        'tempat_acara',
     ];
 
     /**

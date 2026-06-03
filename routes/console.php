@@ -21,6 +21,4 @@ Artisan::command('inspire', function () {
 
 
 // Kirim pesan H-1 sebelum acara
-Schedule::command('posyandu:kirim-reminder')->dailyAt('08:00');
-
-// Cara menjalankan secara manual ketik " php artisan posyandu:kirim-reminder "
+Schedule::command('posyandu:kirim-reminder')->everyMinute();

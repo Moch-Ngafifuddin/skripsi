@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class PasienResource extends Resource
 {
@@ -24,182 +25,210 @@ class PasienResource extends Resource
     {
         return $form
             ->schema([
-                // --- IDENTITAS UMUM ---
-                Forms\Components\Section::make('Identitas Umum')
-                    ->description('Data wajib untuk Balita')
-                    ->schema([
-                        Forms\Components\TextInput::make('nik')
-                            ->label('NIK')
-                            ->placeholder('3306171702880008')
-                            ->required()
-                            ->numeric()
-                            ->length(16)
-                            ->unique(ignoreRecord: true),
+                \Filament\Forms\Components\Tabs::make('Pusat Pelayanan Terpadu Balita')
+                    ->tabs([
                         
-                        Forms\Components\TextInput::make('no_kk')
-                            ->label('Nomor KK')
-                            ->placeholder('3322070009000190')
-                            ->numeric(),
+                        // 📑 TAB 1: MEJA 1 (PENDAFTARAN & IDENTITAS)
+                        \Filament\Forms\Components\Tabs\Tab::make('Meja 1: Pendaftaran & Profil')
+                            ->icon('heroicon-o-user-plus')
+                            ->schema([
+                                \Filament\Forms\Components\Group::make([
+                                    Forms\Components\TextInput::make('nik')
+                                        ->label('NIK Anak')
+                                        ->required()
+                                        ->maxLength(16)
+                                        ->placeholder('Masukkan 16 digit NIK'),
+                                    Forms\Components\TextInput::make('nama')
+                                        ->label('Nama Lengkap Balita')
+                                        ->required()
+                                        ->placeholder('Contoh: Radithya Adhyasta Pratama'),
+                                    Forms\Components\Select::make('jenis_kelamin')
+                                        ->label('Jenis Kelamin')
+                                        ->options([
+                                            'L' => 'Laki-laki',
+                                            'P' => 'Perempuan',
+                                        ])
+                                        ->required()
+                                        ->live(),
+                                    Forms\Components\DatePicker::make('tanggal_lahir')
+                                        ->label('Tanggal Lahir')
+                                        ->required()
+                                        ->native(false)
+                                        ->live(),
+                                ])->columns(2),
 
-                        Forms\Components\TextInput::make('nama')
-                            ->label('Nama Lengkap')
-                            ->placeholder('Ega Camelia Kusworo')
-                            ->required(),
-
-                        Forms\Components\Select::make('jenis_kelamin')
-                            ->options([
-                                'L' => 'Laki-laki',
-                                'P' => 'Perempuan',
+                                \Filament\Forms\Components\Section::make('Data Orang Tua / Wali')
+                                    ->schema([
+                                        Forms\Components\TextInput::make('nama_ibu')->label('Nama Ibu Kandung'),
+                                        Forms\Components\TextInput::make('nama_ayah')->label('Nama Ayah'),
+                                        Forms\Components\TextInput::make('no_hp')->label('Nomor WhatsApp (Aktif)')->tel(),
+                                    ])->columns(3)
                             ])
-                            ->required(),
+                            ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
 
-                        Forms\Components\TextInput::make('tempat_lahir')
-                            ->required(),
-                        
-                        Forms\Components\DatePicker::make('tgl_lahir')
-                            ->label('Tanggal Lahir')
-                            ->required()
-                            ->maxDate(now()),
-
-                        Forms\Components\Textarea::make('alamat')
-                            ->columnSpanFull(),
-                    ])->columns(2),
-
-                // --- DATA KHUSUS BALITA ---
-                Forms\Components\Section::make('Data Khusus Balita (Buku KIA)')
-                    ->description('Isi bagian ini HANYA jika mendaftarkan Balita')
-                    ->icon('heroicon-o-face-smile')
-                    ->collapsed()
-                    ->schema([
-                        Forms\Components\Grid::make(3)
+                        // 📑 TAB 2: MEJA 2-5 (PELAYANAN BULANAN)
+                        \Filament\Forms\Components\Tabs\Tab::make('Meja 2-5 & Riwayat')
+                            ->icon('heroicon-o-plus-circle')
                             ->schema([
-                                Forms\Components\TextInput::make('nama_ayah')->label('Nama Ayah'),
-                                Forms\Components\TextInput::make('nik_ayah')->label('NIK Ayah')->numeric()->length(16),
-                                Forms\Components\TextInput::make('pendidikan_pekerjaan_ayah')->label('Pendidikan / Pekerjaan'),
+                                Forms\Components\Repeater::make('pemeriksaanBayi')
+                                    ->relationship('pemeriksaanBayi')
+                                    ->label('Siklus Pengukuran & Konseling Anak')
+                                    ->createItemButtonLabel('Tambah Data Kunjungan Bulan Ini')
+                                    ->collapsible()
+                                    ->schema([
+                                        
+                                        \Filament\Forms\Components\Grid::make(3)
+                                            ->schema([
+                                                Forms\Components\DatePicker::make('tgl_periksa')
+                                                    ->label('Tanggal Periksa')
+                                                    ->default(now())
+                                                    ->required()
+                                                    ->live()
+                                                    ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
+                                                        $tglLahir = $get('../../tanggal_lahir');
+                                                        if ($tglLahir && $state) {
+                                                            $lahir = Carbon::parse($tglLahir);
+                                                            $periksa = Carbon::parse($state);
+                                                            $selisih = $lahir->diffInMonths($periksa, false);
+                                                            $set('usia_bulan', max(0, $selisih));
+                                                        }
+                                                    }),
+
+                                                Forms\Components\TextInput::make('usia_bulan')
+                                                    ->label('Usia (Bulan)')
+                                                    ->numeric()
+                                                    ->required()
+                                                    ->readOnly() 
+                                                    ->helperText('Otomatis'),
+                                            ]),
+
+                                        // ⚖️ FIELD KHUSUS MEJA 2
+                                        \Filament\Forms\Components\Fieldset::make('Meja 2: Pengukuran Fisik')
+                                            ->schema([
+                                                Forms\Components\TextInput::make('berat_badan')
+                                                    ->label('Berat Badan (Kg)')
+                                                    ->numeric()
+                                                    ->required()
+                                                    ->lazy() 
+                                                    ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
+                                                        if (!empty($state)) self::kalkulasiStatusGizi($set, $get);
+                                                    }),
+                                                Forms\Components\TextInput::make('tinggi_badan')
+                                                    ->label('Tinggi Badan (Cm)')
+                                                    ->numeric()
+                                                    ->required()
+                                                    ->lazy() 
+                                                    ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
+                                                        if (!empty($state)) self::kalkulasiStatusGizi($set, $get);
+                                                    }),
+                                            ])->columns(2)
+                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [2, 1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
+
+                                        // 📏 FIELD KHUSUS MEJA 3
+                                        \Filament\Forms\Components\Fieldset::make('Meja 3: LiLA & Kepala')
+                                            ->schema([
+                                                Forms\Components\TextInput::make('lila')->label('LiLA (Cm)')->numeric(),
+                                                Forms\Components\TextInput::make('lingkar_kepala')->label('Lingkar Kepala (Cm)')->numeric(),
+                                            ])->columns(2)
+                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [3, 1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
+
+                                        // 💬 FIELD KHUSUS MEJA 4 & 5
+                                        \Filament\Forms\Components\Fieldset::make('Meja 4-5: Z-Score & Wawancara')
+                                            ->schema([
+                                                Forms\Components\TextInput::make('status_gizi')->label('Status Gizi')->readOnly(),
+                                                Forms\Components\TextInput::make('status_stunting')->label('Status Stunting')->readOnly(),
+                                                Forms\Components\Textarea::make('catatan')->label('Catatan & Intervensi')->rows(2)->columnSpan('full'),
+                                            ])->columns(2)
+                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [4, 5, 1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
+
+                                    ])->columns(1)
                             ]),
 
-                        Forms\Components\Grid::make(3)
+                        // 📑 TAB 3: KMS DIGITAL
+                        \Filament\Forms\Components\Tabs\Tab::make('KMS & Kurva Pertumbuhan')
+                            ->icon('heroicon-o-chart-bar')
                             ->schema([
-                                Forms\Components\TextInput::make('nama_ibu')->label('Nama Ibu'),
-                                Forms\Components\TextInput::make('nik_ibu')->label('NIK Ibu')->numeric()->length(16),
-                                Forms\Components\TextInput::make('pendidikan_pekerjaan_ibu')->label('Pendidikan / Pekerjaan'),
+                                Forms\Components\ViewField::make('grafik_kms')
+                                    ->view('filament.pages.kms-grafik-layout')
                             ]),
 
-                        Forms\Components\Grid::make(4)
+                        // 🟢 SOLUSI UTAMA: 📑 TAB 4 RIWAYAT PEMERIKSAAN VIA CUSTOM BLADE (CEK-RIWAYAT)
+                        \Filament\Forms\Components\Tabs\Tab::make('Riwayat Pengukuran')
+                            ->icon('heroicon-o-clock')
                             ->schema([
-                                Forms\Components\TextInput::make('anak_ke')->label('Anak Ke-')->numeric(),
-                                Forms\Components\TextInput::make('berat_lahir')->label('BB Lahir (Gram)')->numeric(),
-                                Forms\Components\TextInput::make('panjang_lahir')->label('PB Lahir (Cm)')->numeric(),
-                                Forms\Components\Checkbox::make('imd')->label('IMD'),
+                                Forms\Components\ViewField::make('riwayat_pengukuran_blade')
+                                    ->view('filament.pages.cek-riwayat-layout') // Mengarah ke file penjembatan view
                             ]),
                             
-                        Forms\Components\Radio::make('riwayat_asi')
-                            ->label('Riwayat ASI Eksklusif')
-                            ->options(['E1'=>'E1','E2'=>'E2','E3'=>'E3','E4'=>'E4','E5'=>'E5','E6'=>'E6'])
-                            ->inline()
-                            ->columnSpanFull(),
-                    ]),
-
-                // --- KONTAK ---
-                Forms\Components\Section::make('Kontak (Opsional)')
-                    ->schema([
-                        Forms\Components\TextInput::make('nama_wali')->label('Nama Wali'),
-                        Forms\Components\TextInput::make('no_hp')->label('No HP / WhatsApp')->tel(),
-                    ])->columns(2),
+                    ])->columnSpan('full')
             ]);
+    }
+
+    protected static function kalkulasiStatusGizi(Forms\Set $set, Forms\Get $get): void
+    {
+        $bb = $get('berat_badan');
+        $tb = $get('tinggi_badan');
+        $usia = $get('usia_bulan');
+        $jk = $get('../../jenis_kelamin'); 
+
+        if ($usia !== null && !empty($jk)) {
+            if (!empty($bb) && is_numeric($bb)) {
+                $set('status_gizi', \App\Helpers\AntropometriHelper::hitungBBU($usia, $bb, $jk));
+            }
+            if (!empty($tb) && is_numeric($tb)) {
+                $set('status_stunting', \App\Helpers\AntropometriHelper::hitungTBU($usia, $tb, $jk));
+            }
+        }
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('nik')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('nama')->searchable()->weight('bold'),
-                Tables\Columns\TextColumn::make('tgl_lahir')
-                    ->label('Umur')
-                    ->formatStateUsing(function (?string $state): string {
-                        if (!$state) {
-                            return '-';
-                        }
-                        $umur = \Carbon\Carbon::parse($state)->diff(\Carbon\Carbon::now());
-                        return "{$umur->y} Tahun {$umur->m} Bulan {$umur->d} Hari";
-                    }),
-                Tables\Columns\TextColumn::make('jenis_kelamin')
-                    ->badge()
-                    ->colors(['info' => 'L', 'danger' => 'P']),
+                Tables\Columns\TextColumn::make('nik')->label('NIK')->searchable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('nama')->label('Nama Balita')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('jenis_kelamin')->label('L/P')->sortable(),
+                Tables\Columns\TextColumn::make('tanggal_lahir')->label('Tanggal Lahir')->date('d M Y')->sortable(),
+                Tables\Columns\TextColumn::make('nama_ibu')->label('Nama Ibu')->searchable(),
+                Tables\Columns\TextColumn::make('no_hp')->label('No. WhatsApp')->searchable(),
             ])
-            // Filter otomatis agar pasien yang diarsipkan ("is_arsip" => true) tidak muncul di daftar aktif
-            ->modifyQueryUsing(fn ($query) => $query->where('is_arsip', false))
+            ->filters([
+                //
+            ])
             ->actions([
-                Tables\Actions\EditAction::make()->iconButton()->label('Ubah'),
+                Tables\Actions\EditAction::make(),
                 
-                // 🛠️ REFORMASI TOMBOL HAPUS & PENGARSIPAN DINAMIS
-                Tables\Actions\DeleteAction::make()
-                    ->iconButton()
-                    ->label('Hapus')
-                    ->modalHeading('Konfirmasi Penghapusan / Pengarsipan Pasien')
-                    ->modalSubmitActionLabel('Proses Data')
+                Tables\Actions\Action::make('arsipkan')
+                    ->label('Arsipkan Data')
+                    ->icon('heroicon-o-archive-box')
+                    ->color('warning')
+                    ->visible(fn () => in_array(Auth::user()?->meja_tugas, [1, 'superadmin', null])) 
                     ->form([
-                        // 1. Pilihan Alasan Utama
-                        Forms\Components\Select::make('alasan_hapus')
-                            ->label('Alasan Penghapusan Data')
+                        Forms\Components\Select::make('keterangan_pindah')
+                            ->label('Alasan Arsip')
                             ->options([
-                                'salah_input' => 'Salah Input (Hapus Permanen)',
-                                'pindah' => 'Balita Pindah Domisili / Puskesmas',
-                                'meninggal' => 'Balita Meninggal Dunia',
+                                'pindah_domisili' => 'Pindah Domisili',
+                                'lulus_posyandu' => 'Lulus Posyandu (Usia > 60 Bulan)',
+                                'meninggal_dunia' => 'Meninggal Dunia',
                             ])
                             ->required()
                             ->live(),
-
-                        // 2. Form Tambahan: PINDAH DOMISILI / PUSKESMAS
-                        Forms\Components\Textarea::make('keterangan_pindah')
-                            ->label('Keterangan Pindah Puskesmas / Domisili')
-                            ->placeholder('Masukkan lokasi puskesmas baru atau alamat domisili baru...')
-                            ->required()
-                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'pindah'),
-
-                        // 3. Form Tambahan: MENINGGAL DUNIA
                         Forms\Components\DatePicker::make('tgl_meninggal')
                             ->label('Tanggal Meninggal')
-                            ->required()
-                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'meninggal'),
-
-                        Forms\Components\TextInput::make('penyebab_meninggal')
-                            ->label('Penyebab Meninggal')
-                            ->required()
-                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'meninggal'),
-
-                        Forms\Components\TextInput::make('tempat_pemakaman')
-                            ->label('Tempat Pemakaman')
-                            ->required()
-                            ->visible(fn (Forms\Get $get) => $get('alasan_hapus') === 'meninggal'),
+                            ->visible(fn (Forms\Get $get) => $get('keterangan_pindah') === 'meninggal_dunia')
+                            ->required(fn (Forms\Get $get) => $get('keterangan_pindah') === 'meninggal_dunia'),
                     ])
-                    ->action(function (array $data, $record) {
-                        if ($data['alasan_hapus'] === 'salah_input') {
-                            // JALUR 1: Hapus Permanen dari Database
-                            $record->delete();
+                    ->action(function (Pasien $record, array $data) {
+                        $record->update([
+                            'is_arsip' => true,
+                            'keterangan_pindah' => $data['keterangan_pindah'] ?? null,
+                            'tgl_meninggal' => $data['tgl_meninggal'] ?? null,
+                        ]);
 
-                            \Filament\Notifications\Notification::make()
-                                ->title('Data Dihapus Permanen')
-                                ->body('Data pasien berhasil dihapus secara permanen karena salah input.')
-                                ->success()
-                                ->send();
-                        } else {
-                            // JALUR 2 & 3: Masuk ke Sistem Arsip (is_arsip = true)
-                            $record->update([
-                                'is_arsip' => true,
-                                'keterangan_pindah' => $data['keterangan_pindah'] ?? null,
-                                'tgl_meninggal' => $data['tgl_meninggal'] ?? null,
-                                'penyebab_meninggal' => $data['penyebab_meninggal'] ?? null,
-                                'tempat_pemakaman' => $data['tempat_pemakaman'] ?? null,
-                            ]);
-
-                            \Filament\Notifications\Notification::make()
-                                ->title('Data Berhasil Diarsipkan')
-                                ->body('Pasien telah dipindahkan ke daftar arsip dan dikeluarkan dari daftar aktif.')
-                                ->success()
-                                ->send();
-                        }
+                        \Filament\Notifications\Notification::make()
+                            ->title('Data Berhasil Diarsipkan')
+                            ->success()
+                            ->send();
                     }),
             ])
             ->bulkActions([]);
@@ -214,8 +243,7 @@ class PasienResource extends Resource
         ];
     }
 
-    // --- LOGIKA HAK AKSES MENU ---
-    public static function shouldRegisterNavigation(): bool
+    public static function canAccess(): bool
     {
         if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
             return true;
