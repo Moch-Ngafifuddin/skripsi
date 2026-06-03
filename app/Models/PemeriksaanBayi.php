@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PemeriksaanBayi extends Model
 {
     use HasFactory;
-    protected $table = 'pemeriksaan_bayi'; // Sesuaikan nama tabel
-    protected $guarded = [];
+    protected $table = 'pemeriksaan_bayi';
+   // protected $guarded = [];
     protected $fillable = [
         'pasien_id',
         'tgl_periksa',

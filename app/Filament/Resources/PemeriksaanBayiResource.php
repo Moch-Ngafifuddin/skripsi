@@ -226,6 +226,7 @@ class PemeriksaanBayiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with('pasien'))
             ->columns([
                 Tables\Columns\TextColumn::make('pasien.nama')
                     ->label('Nama Balita')
@@ -346,5 +347,11 @@ class PemeriksaanBayiResource extends Resource
     public static function canCreate(): bool
     {
         return in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin']);
+    }
+
+    public static function canAccess(): bool
+    {
+        $akses = Auth::user()?->akses_menu ?? [];
+        return in_array('bayi', $akses) || Auth::user()?->meja_tugas === 'superadmin';
     }
 }

@@ -64,7 +64,8 @@ class PasienResource extends Resource
                                         Forms\Components\TextInput::make('no_hp')->label('Nomor WhatsApp (Aktif)')->tel(),
                                     ])->columns(3)
                             ])
-                            ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
+                            // Pengamanan Akses Meja 1
+                            ->disabled(fn () => !in_array(auth()->user()->meja_tugas, ['meja_1', 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
 
                         // 📑 TAB 2: MEJA 2-5 (PELAYANAN BULANAN)
                         \Filament\Forms\Components\Tabs\Tab::make('Meja 2-5 & Riwayat')
@@ -122,7 +123,7 @@ class PasienResource extends Resource
                                                         if (!empty($state)) self::kalkulasiStatusGizi($set, $get);
                                                     }),
                                             ])->columns(2)
-                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [2, 1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
+                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, ['meja_2', 'meja_1', 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
 
                                         // 📏 FIELD KHUSUS MEJA 3
                                         \Filament\Forms\Components\Fieldset::make('Meja 3: LiLA & Kepala')
@@ -130,16 +131,20 @@ class PasienResource extends Resource
                                                 Forms\Components\TextInput::make('lila')->label('LiLA (Cm)')->numeric(),
                                                 Forms\Components\TextInput::make('lingkar_kepala')->label('Lingkar Kepala (Cm)')->numeric(),
                                             ])->columns(2)
-                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [3, 1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
+                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, ['meja_3', 'meja_1', 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
 
                                         // 💬 FIELD KHUSUS MEJA 4 & 5
                                         \Filament\Forms\Components\Fieldset::make('Meja 4-5: Z-Score & Wawancara')
                                             ->schema([
-                                                Forms\Components\TextInput::make('status_gizi')->label('Status Gizi')->readOnly(),
-                                                Forms\Components\TextInput::make('status_stunting')->label('Status Stunting')->readOnly(),
+                                                Forms\Components\TextInput::make('status_gizi')->label('Status Gizi (BB/U)')->readOnly()->placeholder('Menghitung...'),
+                                                Forms\Components\TextInput::make('zscore_bbu')->label('Nilai Z-Score (BB/U)')->readOnly()->placeholder('0.00'),
+                                                
+                                                Forms\Components\TextInput::make('status_stunting')->label('Status Stunting (TB/U)')->readOnly()->placeholder('Menghitung...'),
+                                                Forms\Components\TextInput::make('zscore_tbu')->label('Nilai Z-Score (TB/U)')->readOnly()->placeholder('0.00'),
+
                                                 Forms\Components\Textarea::make('catatan')->label('Catatan & Intervensi')->rows(2)->columnSpan('full'),
                                             ])->columns(2)
-                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, [4, 5, 1, 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
+                                              ->disabled(fn () => !in_array(auth()->user()->meja_tugas, ['meja_4', 'meja_5', 'meja_1', 'superadmin', null]) && !in_array('pasien', auth()->user()->akses_menu ?? [])),
 
                                     ])->columns(1)
                             ]),
@@ -152,31 +157,51 @@ class PasienResource extends Resource
                                     ->view('filament.pages.kms-grafik-layout')
                             ]),
 
-                        // 🟢 SOLUSI UTAMA: 📑 TAB 4 RIWAYAT PEMERIKSAAN VIA CUSTOM BLADE (CEK-RIWAYAT)
+                        // 📑 TAB 4 RIWAYAT PEMERIKSAAN VIA CUSTOM BLADE
                         \Filament\Forms\Components\Tabs\Tab::make('Riwayat Pengukuran')
                             ->icon('heroicon-o-clock')
                             ->schema([
                                 Forms\Components\ViewField::make('riwayat_pengukuran_blade')
-                                    ->view('filament.pages.cek-riwayat-layout') // Mengarah ke file penjembatan view
+                                    ->view('filament.pages.cek-riwayat-layout') 
                             ]),
                             
                     ])->columnSpan('full')
             ]);
     }
 
+    // ⚙️ FUNGSI KALKULASI OTOMATIS Z-SCORE
     protected static function kalkulasiStatusGizi(Forms\Set $set, Forms\Get $get): void
     {
         $bb = $get('berat_badan');
         $tb = $get('tinggi_badan');
         $usia = $get('usia_bulan');
-        $jk = $get('../../jenis_kelamin'); 
+        $jkMentah = $get('../../jenis_kelamin'); 
 
+        // Sinkronisasi data jenis kelamin form dengan master data Kemenkes
+        $jk = null;
+        if ($jkMentah === 'L') {
+            $jk = 'L'; 
+        } elseif ($jkMentah === 'P') {
+            $jk = 'P';
+        }
+
+        // Kalkulasi baru akan berjalan jika Usia dan Kelamin sudah lengkap
         if ($usia !== null && !empty($jk)) {
+            
+            // ⚖️ Hitung Gizi & Z-Score BB/U
             if (!empty($bb) && is_numeric($bb)) {
-                $set('status_gizi', \App\Helpers\AntropometriHelper::hitungBBU($usia, $bb, $jk));
+                $set('status_gizi', \App\Helpers\AntropometriHelper::hitungBBU($jk, $usia, $bb));
+                
+                $zscoreBbu = \App\Helpers\AntropometriHelper::hitungZScoreBBU($jk, $usia, $bb);
+                $set('zscore_bbu', is_null($zscoreBbu) ? '0.00' : number_format($zscoreBbu, 2));
             }
+            
+            // 📏 Hitung Stunting & Z-Score TB/U
             if (!empty($tb) && is_numeric($tb)) {
-                $set('status_stunting', \App\Helpers\AntropometriHelper::hitungTBU($usia, $tb, $jk));
+                $set('status_stunting', \App\Helpers\AntropometriHelper::hitungTBU($jk, $usia, $tb));
+                
+                $zscoreTbu = \App\Helpers\AntropometriHelper::hitungZScoreTBU($jk, $usia, $tb);
+                $set('zscore_tbu', is_null($zscoreTbu) ? '0.00' : number_format($zscoreTbu, 2));
             }
         }
     }
@@ -202,7 +227,8 @@ class PasienResource extends Resource
                     ->label('Arsipkan Data')
                     ->icon('heroicon-o-archive-box')
                     ->color('warning')
-                    ->visible(fn () => in_array(Auth::user()?->meja_tugas, [1, 'superadmin', null])) 
+                    // Keamanan: Hanya Meja 1 / Superadmin yang berhak arsip data
+                    ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin', null])) 
                     ->form([
                         Forms\Components\Select::make('keterangan_pindah')
                             ->label('Alasan Arsip')
@@ -243,6 +269,7 @@ class PasienResource extends Resource
         ];
     }
 
+    // 🛡️ KEAMANAN: Memblokir akses URL bypass dari user yang tidak berhak
     public static function canAccess(): bool
     {
         if (Auth::user()?->email === 'admin@posyandu.com' || Auth::user()?->meja_tugas === 'superadmin') {
