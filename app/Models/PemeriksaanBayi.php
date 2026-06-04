@@ -45,4 +45,40 @@ class PemeriksaanBayi extends Model
     public function pasien(): BelongsTo {
         return $this->belongsTo(Pasien::class, 'pasien_id');
     }
+
+    
+    protected static function booted()
+    {
+        static::saving(function ($model) {
+            $pasien = Pasien::find($model->pasien_id);
+            
+            if ($pasien && $model->berat_badan && $model->tinggi_badan) {
+                // Koreksi toleransi Cara Ukur berdasarkan PMK No.2 Tahun 2020
+                // Anak < 24 bulan diukur berdiri: + 0.7 cm
+                // Anak >= 24 bulan diukur terlentang: - 0.7 cm
+                $tbKoreksi = (float) $model->tinggi_badan;
+                if ($model->usia_bulan < 24 && $model->cara_ukur == 'berdiri') {
+                    $tbKoreksi += 0.7;
+                } elseif ($model->usia_bulan >= 24 && $model->cara_ukur == 'terlentang') {
+                    $tbKoreksi -= 0.7;
+                }
+
+                $jk = $pasien->jenis_kelamin;
+                $bb = $model->berat_badan;
+                $umur = $model->usia_bulan;
+
+                // Hitung BB/U
+                $model->zscore_bbu = AntropometriHelper::hitungZScoreBBU($jk, $umur, $bb);
+                $model->status_gizi = AntropometriHelper::hitungBbu($jk, $umur, $bb);
+
+                // Hitung TB/U
+                $model->zscore_tbu = AntropometriHelper::hitungZScoreTBU($jk, $umur, $tbKoreksi);
+                $model->status_stunting = AntropometriHelper::hitungTbu($jk, $umur, $tbKoreksi);
+
+                // Hitung BB/TB
+                $model->zscore_bbtb = AntropometriHelper::hitungZScoreBBTB($jk, $tbKoreksi, $bb);
+                $model->status_bbtb = AntropometriHelper::hitungBbtb($jk, $tbKoreksi, $bb);
+            }
+        });
+    }
 }
