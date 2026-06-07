@@ -16,12 +16,11 @@ class PemeriksaanBayiResource extends Resource
 {
     protected static ?string $model = PemeriksaanBayi::class;
     
-    // 🟢 Navigasi diaktifkan agar bisa diakses langsung sebagai menu utama Pelayanan Bulanan
     protected static bool $shouldRegisterNavigation = true;
-    protected static ?string $navigationIcon = 'heroicon-o-face-smile'; 
-    protected static ?string $navigationGroup = 'Pemeriksaan';
-    protected static ?string $navigationLabel = 'Posyandu Balita';
-    protected static ?string $pluralModelLabel = 'Posyandu Balita';
+    protected static ?string $navigationIcon = 'fas-baby'; 
+    protected static ?string $navigationGroup = 'Pelayanan';
+    protected static ?string $navigationLabel = 'Pemeriksaan Balita';
+    protected static ?string $pluralModelLabel = 'Pendaftaran Pemeriksaan Balita';
 
     public static function form(Form $form): Form
     {

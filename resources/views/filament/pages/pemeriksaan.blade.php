@@ -36,54 +36,5 @@
                 </svg>
             </div>
         </a>
-
-        <!-- MENU 2: REMAJA
-        <a href="{{ $urlPemeriksaanRemaja }}" class="group flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-150">
-            <div class="flex items-center gap-3.5">
-                <div class="p-2.5 w-11 h-11 bg-blue-50 dark:bg-blue-950/50 rounded-lg text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">
-                        Pemeriksaan Remaja
-                    </h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        Pencatatan Klinis Remaja Berkala
-                    </p>
-                </div>
-            </div>
-            <div class="text-gray-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-all">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                </svg>
-            </div>
-        </a>
-
-        MENU 3: LANSIA
-        <a href="{{ $urlPemeriksaanLansia }}" class="group flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow hover:border-primary-500 dark:hover:border-primary-500 transition-all duration-150">
-            <div class="flex items-center gap-3.5">
-                <div class="p-2.5 w-11 h-11 bg-emerald-50 dark:bg-emerald-950/50 rounded-lg text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">
-                        Pemeriksaan Lansia
-                    </h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        Pencatatan Penyakit Tidak Menular (PTM)
-                    </p>
-                </div>
-            </div>
-            <div class="text-gray-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-all">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                </svg>
-            </div>
-        </a>  -->
-
     </div>
 </x-filament-panels::page>
