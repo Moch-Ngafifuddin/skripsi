@@ -96,7 +96,11 @@ class PasienResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('nik')->label('NIK')->searchable(),
+                Tables\Columns\TextColumn::make('nik')
+                ->label('NIK')
+                ->searchable(query: function ($query, $search) {
+                    $query->orWhere('nik_hash', hash('sha256', $search));
+                }),
                 Tables\Columns\TextColumn::make('nama')->label('Nama Balita')->searchable(),
                 Tables\Columns\TextColumn::make('jenis_kelamin')->label('L/P'),
                 Tables\Columns\TextColumn::make('tgl_lahir')->label('Tanggal Lahir')->date('d M Y'),

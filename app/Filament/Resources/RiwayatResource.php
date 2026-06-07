@@ -24,6 +24,7 @@ class RiwayatResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+        ->modifyQueryUsing(fn ($query) => $query->with('pemeriksaanBayi'))
             ->columns([
                 // 1. Kolom No (Nomor Urut Otomatis)
                 Tables\Columns\TextColumn::make('no')

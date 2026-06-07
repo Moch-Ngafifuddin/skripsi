@@ -262,7 +262,7 @@ class PemeriksaanBayiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with('pasien'))
+            ->modifyQueryUsing(fn ($query) => $query->with(['pasien']))
             ->columns([
                 Tables\Columns\TextColumn::make('pasien.nama')->label('Nama Balita')->searchable(),
                 Tables\Columns\TextColumn::make('keterangan_umur')->label('Usia')->badge()->color('success'),

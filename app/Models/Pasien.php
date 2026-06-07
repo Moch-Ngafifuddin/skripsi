@@ -7,30 +7,29 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Pasien extends Model
 {
-    protected $table = 'pasien'; 
+    protected $table = 'pasien';
+    protected $casts = [
+        'nik' => 'encrypted',
+        'no_kk' => 'encrypted',
+        'no_hp' => 'encrypted',
+        'nik_ibu' => 'encrypted',
+        'nik_ayah' => 'encrypted',
+    ];
     protected $guarded = [];
 
-    /**
-     * Relasi ke riwayat pemeriksaan Balita
-     */
-    public function pemeriksaanBayi()
+    public function pemeriksaanBayi(): HasMany
     {
-        return $this->hasMany(PemeriksaanBayi::class, 'pasien_id')->orderBy('id', 'desc');
+        // Pastikan 'pasien_id' adalah nama kolom foreign key yang benar di tabel pemeriksaan_bayi
+        return $this->hasMany(PemeriksaanBayi::class, 'pasien_id', 'id');
     }
 
-    /**
-     * Relasi ke riwayat pemeriksaan Remaja
-     */
-    public function pemeriksaanRemaja(): HasMany
+    protected static function booted()
     {
-        return $this->hasMany(PemeriksaanRemaja::class, 'pasien_id');
-    }
-
-    /**
-     * Relasi ke riwayat pemeriksaan Lansia
-     */
-    public function pemeriksaanLansia(): HasMany
-    {
-        return $this->hasMany(PemeriksaanLansia::class, 'pasien_id');
+        static::saving(function ($pasien) {
+            // Jika NIK diisi/diubah, otomatis generate hash-nya
+            if ($pasien->isDirty('nik')) {
+                $pasien->nik_hash = $pasien->nik ? hash('sha256', $pasien->nik) : null;
+            }
+        });
     }
 }
