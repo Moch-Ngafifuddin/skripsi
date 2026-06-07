@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Filament\Resources;
-
 use Carbon\Carbon;
 use App\Models\Pasien;
 use App\Filament\Resources\PemeriksaanBayiResource\Pages;
@@ -17,12 +16,8 @@ class PemeriksaanBayiResource extends Resource
 {
     protected static ?string $model = PemeriksaanBayi::class;
     
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
-    
-    protected static bool $shouldRegisterNavigation = false;
+    // 🟢 Navigasi diaktifkan agar bisa diakses langsung sebagai menu utama Pelayanan Bulanan
+    protected static bool $shouldRegisterNavigation = true;
     protected static ?string $navigationIcon = 'heroicon-o-face-smile'; 
     protected static ?string $navigationGroup = 'Pemeriksaan';
     protected static ?string $navigationLabel = 'Posyandu Balita';
@@ -30,13 +25,14 @@ class PemeriksaanBayiResource extends Resource
 
     public static function form(Form $form): Form
     {
-        // --- FUNGSI AUTO-FILL UMUR KE DATABASE ---
+        // ⚙️ 1. FUNGSI AUTO-FILL UMUR & USIA BULAN KE DATABASE
         $hitungUmur = function (Forms\Set $set, Forms\Get $get) {
             $pasienId = $get('pasien_id');
             $tglPeriksa = $get('tgl_periksa');
             
             if (!$pasienId || !$tglPeriksa) {
                 $set('keterangan_umur', null);
+                $set('usia_bulan', null);
                 return;
             }
             
@@ -50,6 +46,8 @@ class PemeriksaanBayiResource extends Resource
             $bulan = (int) $lahir->diffInMonths($periksa);
             $tahun = (int) $lahir->diffInYears($periksa);
             
+            $set('usia_bulan', max(0, $bulan)); // 🟢 Penting untuk Z-Score
+            
             if ($tahun >= 1) {
                 $sisaBulan = $bulan % 12;
                 $set('keterangan_umur', $sisaBulan > 0 ? "{$tahun} Thn {$sisaBulan} Bln" : "{$tahun} Thn");
@@ -60,10 +58,62 @@ class PemeriksaanBayiResource extends Resource
             }
         };
 
+        // ⚙️ 2. FUNGSI KALKULASI Z-SCORE REAL-TIME
+        $kalkulasiStatusGizi = function (Forms\Set $set, Forms\Get $get) {
+            $bb = $get('berat_badan');
+            $tb = $get('tinggi_badan');
+            $caraUkur = $get('cara_ukur');
+            $usia = $get('usia_bulan');
+            $pasienId = $get('pasien_id');
+
+            if (!$pasienId || $usia === null) return;
+            
+            $pasien = Pasien::find($pasienId);
+            if (!$pasien) return;
+
+            $jk = $pasien->jenis_kelamin;
+
+            // BB/U
+            if (!empty($bb) && is_numeric($bb)) {
+                if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungBbu')) {
+                    $set('status_gizi', \App\Helpers\AntropometriHelper::hitungBbu($jk, $usia, $bb));
+                }
+                if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungZScoreBBU')) {
+                    $zscoreBbu = \App\Helpers\AntropometriHelper::hitungZScoreBBU($jk, $usia, $bb);
+                    $set('zscore_bbu', is_null($zscoreBbu) ? '0.00' : number_format($zscoreBbu, 2));
+                }
+            }
+
+            // TB/U & BB/TB
+            if (!empty($tb) && is_numeric($tb) && !empty($caraUkur)) {
+                $tbKoreksi = (float) $tb;
+                if ($usia < 24 && $caraUkur === 'berdiri') $tbKoreksi += 0.7;
+                if ($usia >= 24 && $caraUkur === 'terlentang') $tbKoreksi -= 0.7;
+
+                if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungTbu')) {
+                    $set('status_stunting', \App\Helpers\AntropometriHelper::hitungTbu($jk, $usia, $tbKoreksi));
+                }
+                if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungZScoreTBU')) {
+                    $zscoreTbu = \App\Helpers\AntropometriHelper::hitungZScoreTBU($jk, $usia, $tbKoreksi);
+                    $set('zscore_tbu', is_null($zscoreTbu) ? '0.00' : number_format($zscoreTbu, 2));
+                }
+
+                if (!empty($bb) && is_numeric($bb)) {
+                    if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungBbtb')) {
+                        $set('status_bbtb', \App\Helpers\AntropometriHelper::hitungBbtb($jk, $tbKoreksi, $bb));
+                    }
+                    if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungZScoreBBTB')) {
+                        $zscoreBbtb = \App\Helpers\AntropometriHelper::hitungZScoreBBTB($jk, $tbKoreksi, $bb);
+                        $set('zscore_bbtb', is_null($zscoreBbtb) ? '0.00' : number_format($zscoreBbtb, 2));
+                    }
+                }
+            }
+        };
+
         return $form
             ->schema([
-                // --- MEJA 1: Pendaftaran Balita Baru ---
-                Forms\Components\Section::make('Data Pendaftaran Balita Baru (Meja 1)')
+                // --- MEJA 1: Pendaftaran Kunjungan ---
+                Forms\Components\Section::make('Data Kunjungan Balita (Meja 1)')
                     ->schema([
                         Forms\Components\Select::make('pasien_id')
                             ->relationship('pasien', 'nama')
@@ -72,9 +122,13 @@ class PemeriksaanBayiResource extends Resource
                             ->preload()
                             ->required()
                             ->live() 
-                            ->afterStateUpdated($hitungUmur)
+                            ->afterStateUpdated(function(Forms\Set $set, Forms\Get $get) use ($hitungUmur, $kalkulasiStatusGizi) {
+                                $hitungUmur($set, $get);
+                                $kalkulasiStatusGizi($set, $get);
+                            })
                             ->disabled(fn () => !in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin']))
                             ->createOptionForm([
+                                // Form Ringkas untuk membuat Pasien Baru secara mendadak di meja pelayanan
                                 Forms\Components\Section::make('Identitas Umum')
                                     ->schema([
                                         Forms\Components\TextInput::make('nik')->label('NIK')->required()->numeric()->length(16)->unique('pasiens', 'nik'),
@@ -84,30 +138,6 @@ class PemeriksaanBayiResource extends Resource
                                         Forms\Components\TextInput::make('tempat_lahir')->required(),
                                         Forms\Components\DatePicker::make('tgl_lahir')->label('Tanggal Lahir')->required()->maxDate(now()),
                                         Forms\Components\Textarea::make('alamat')->columnSpanFull(),
-                                    ])->columns(2),
-                                Forms\Components\Section::make('Data Khusus Balita (Buku KIA)')
-                                    ->schema([
-                                        Forms\Components\Grid::make(2)
-                                            ->schema([
-                                                Forms\Components\TextInput::make('nama_ayah')->label('Nama Ayah'),
-                                                Forms\Components\TextInput::make('nik_ayah')->label('NIK Ayah')->numeric()->length(16),
-                                                Forms\Components\TextInput::make('nama_ibu')->label('Nama Ibu'),
-                                                Forms\Components\TextInput::make('nik_ibu')->label('NIK Ibu')->numeric()->length(16),
-                                            ]),
-                                        Forms\Components\Grid::make(4)
-                                            ->schema([
-                                                Forms\Components\TextInput::make('anak_ke')->label('Anak Ke-')->numeric(),
-                                                Forms\Components\TextInput::make('berat_lahir')->label('BB Lahir (Gram)')->numeric(),
-                                                Forms\Components\TextInput::make('panjang_lahir')->label('PB Lahir (Cm)')->numeric(),
-                                                Forms\Components\Checkbox::make('imd')->label('IMD'),
-                                            ]),
-                                        Forms\Components\Radio::make('riwayat_asi')
-                                            ->label('Riwayat ASI Eksklusif')->options(['E1'=>'E1','E2'=>'E2','E3'=>'E3','E4'=>'E4','E5'=>'E5','E6'=>'E6'])->inline()->columnSpanFull(),
-                                    ]),
-                                Forms\Components\Section::make('Kontak (Opsional)')
-                                    ->schema([
-                                        Forms\Components\TextInput::make('nama_wali')->label('Nama Wali'),
-                                        Forms\Components\TextInput::make('no_hp')->label('No HP / WhatsApp')->tel(),
                                     ])->columns(2),
                             ])
                             ->createOptionAction(function (\Filament\Forms\Components\Actions\Action $action) {
@@ -119,7 +149,10 @@ class PemeriksaanBayiResource extends Resource
                             ->default(now())
                             ->required()
                             ->live() 
-                            ->afterStateUpdated($hitungUmur)
+                            ->afterStateUpdated(function(Forms\Set $set, Forms\Get $get) use ($hitungUmur, $kalkulasiStatusGizi) {
+                                $hitungUmur($set, $get);
+                                $kalkulasiStatusGizi($set, $get);
+                            })
                             ->disabled(fn () => !in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin'])),
 
                         Forms\Components\TextInput::make('keterangan_umur')
@@ -127,6 +160,8 @@ class PemeriksaanBayiResource extends Resource
                             ->disabled() 
                             ->dehydrated() 
                             ->required(),
+                            
+                        Forms\Components\Hidden::make('usia_bulan'), // Menyimpan angka absolut bulan
                     ])->columns(3),
 
                 // --- MEJA 2: TINGGI BADAN & CARA UKUR ---
@@ -135,27 +170,23 @@ class PemeriksaanBayiResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('tinggi_badan')
                             ->label('Tinggi/Panjang Badan (Cm)')
-                            ->numeric(),
-                        // 🟢 TAMBAHAN: Kolom Cara Ukur Kemenkes
+                            ->numeric()
+                            ->live(onBlur: true)
+                            ->afterStateUpdated($kalkulasiStatusGizi),
+                            
                         Forms\Components\Select::make('cara_ukur')
                             ->label('Cara Ukur')
-                            ->options([
-                                'berdiri' => 'Berdiri',
-                                'terlentang' => 'Terlentang',
-                            ]),
+                            ->options(['berdiri' => 'Berdiri', 'terlentang' => 'Terlentang'])
+                            ->live()
+                            ->afterStateUpdated($kalkulasiStatusGizi),
                     ])->columns(2),
 
                 // --- MEJA 3: LINGKAR KEPALA & LILA ---
                 Forms\Components\Section::make('Data Pengukuran Tambahan (Meja 3)')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_3', 'meja_5', 'superadmin']))
                     ->schema([
-                        Forms\Components\TextInput::make('lingkar_kepala')
-                            ->label('Lingkar Kepala (Cm)')
-                            ->numeric(),
-                        // 🟢 PENYESUAIAN: Memakai kolom 'lila' standar database baru
-                        Forms\Components\TextInput::make('lila')
-                            ->label('Lingkar Lengan Atas / LiLA (Cm)')
-                            ->numeric(),
+                        Forms\Components\TextInput::make('lingkar_kepala')->label('Lingkar Kepala (Cm)')->numeric(),
+                        Forms\Components\TextInput::make('lila')->label('Lingkar Lengan Atas / LiLA (Cm)')->numeric(),
                     ])->columns(2),
 
                 // --- MEJA 4: BERAT BADAN ---
@@ -164,23 +195,31 @@ class PemeriksaanBayiResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('berat_badan')
                             ->label('Berat Badan (Kg)')
-                            ->numeric(),
+                            ->numeric()
+                            ->live(onBlur: true)
+                            ->afterStateUpdated($kalkulasiStatusGizi),
                     ]),
 
                 // --- MEJA 5: PELAYANAN & EVALUASI AKHIR ---
                 Forms\Components\Section::make('Pelayanan, Catatan & Hasil (Meja 5)')
-                    ->description('Hanya diisi oleh petugas Meja 5 setelah melihat data Meja 1-4')
+                    ->description('Hasil Z-Score otomatis terisi jika data Meja 1-4 lengkap.')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_5', 'superadmin']))
                     ->schema([
+                        // 🟢 TAMPILAN READONLY HASIL Z-SCORE KEMENKES
+                        Forms\Components\Fieldset::make('Kesimpulan Gizi Anak')
+                            ->schema([
+                                Forms\Components\TextInput::make('status_gizi')->label('Status Gizi (BB/U)')->readOnly(),
+                                Forms\Components\TextInput::make('zscore_bbu')->label('Z-Score (BB/U)')->readOnly(),
+                                Forms\Components\TextInput::make('status_stunting')->label('Status Stunting (TB/U)')->readOnly(),
+                                Forms\Components\TextInput::make('zscore_tbu')->label('Z-Score (TB/U)')->readOnly(),
+                                Forms\Components\TextInput::make('status_bbtb')->label('Status (BB/TB)')->readOnly(),
+                                Forms\Components\TextInput::make('zscore_bbtb')->label('Z-Score (BB/TB)')->readOnly(),
+                            ])->columns(2),
+
                         Forms\Components\Grid::make(3)
                             ->schema([
-                                Forms\Components\TextInput::make('rambu_gizi')
-                                    ->label('Rambu Gizi (N/T/O)')
-                                    ->placeholder('N'),
-                                Forms\Components\TextInput::make('titik_pertumbuhan')
-                                    ->label('Titik Grafik (H/K/BGM)')
-                                    ->placeholder('H'),
-                                // 🟢 TAMBAHAN: Kolom Pitting Edema Bilateral
+                                Forms\Components\TextInput::make('rambu_gizi')->label('Rambu Gizi (N/T/O)')->placeholder('N'),
+                                Forms\Components\TextInput::make('titik_pertumbuhan')->label('Titik Grafik (H/K/BGM)')->placeholder('H'),
                                 Forms\Components\Select::make('pitting_edema')
                                     ->label('Pitting Edema Bilateral')
                                     ->options([
@@ -200,13 +239,11 @@ class PemeriksaanBayiResource extends Resource
                                 Forms\Components\Toggle::make('asi_eksklusif')->label('ASI Eksklusif?')->inline(false),
                                 Forms\Components\Toggle::make('pmba')->label('PMBA?')->inline(false),
                                 Forms\Components\Toggle::make('sdidtk')->label('SDIDTK?')->inline(false),
-                                // 🟢 TAMBAHAN: Toggle Kelas Ibu dan Penerima MBG
                                 Forms\Components\Toggle::make('kelas_ibu')->label('Ikut Kelas Ibu?')->inline(false),
                                 Forms\Components\Toggle::make('menerima_mbg')->label('Dapat MBG?')->inline(false),
                             ]),
                             
-                        Forms\Components\TextInput::make('jenis_imunisasi')
-                            ->label('Jenis Imunisasi (Jika Ada)'),
+                        Forms\Components\TextInput::make('jenis_imunisasi')->label('Jenis Imunisasi (Jika Ada)'),
                             
                         Forms\Components\Textarea::make('catatan')
                             ->label('Catatan / KIE (Konseling)')
@@ -228,19 +265,11 @@ class PemeriksaanBayiResource extends Resource
         return $table
             ->modifyQueryUsing(fn ($query) => $query->with('pasien'))
             ->columns([
-                Tables\Columns\TextColumn::make('pasien.nama')
-                    ->label('Nama Balita')
-                    ->searchable(),
-                
-                Tables\Columns\TextColumn::make('keterangan_umur')
-                    ->label('Usia')
-                    ->badge() 
-                    ->color('success'),
-
+                Tables\Columns\TextColumn::make('pasien.nama')->label('Nama Balita')->searchable(),
+                Tables\Columns\TextColumn::make('keterangan_umur')->label('Usia')->badge()->color('success'),
                 Tables\Columns\TextColumn::make('berat_badan')->label('Berat')->suffix(' Kg')->placeholder('-'),
                 Tables\Columns\TextColumn::make('tinggi_badan')->label('Tinggi')->suffix(' Cm')->placeholder('-'),
                 Tables\Columns\TextColumn::make('lila')->label('LiLA')->suffix(' Cm')->placeholder('-'),
-                
                 Tables\Columns\IconColumn::make('kelas_ibu')->label('Kls Ibu')->boolean(),
                 Tables\Columns\IconColumn::make('menerima_mbg')->label('MBG')->boolean(),
             ])
@@ -255,15 +284,10 @@ class PemeriksaanBayiResource extends Resource
                         'lebih' => 'Risiko Berat Badan Lebih',
                     ])
                     ->query(function ($query, array $data) {
-                        if ($data['value'] === 'sangat_kurang') {
-                            $query->where('status_gizi', 'Berat Badan Sangat Kurang');
-                        } elseif ($data['value'] === 'kurang') {
-                            $query->where('status_gizi', 'Berat Badan Kurang');
-                        } elseif ($data['value'] === 'normal') {
-                            $query->where('status_gizi', 'Berat Badan Normal');
-                        } elseif ($data['value'] === 'lebih') {
-                            $query->where('status_gizi', 'Risiko Berat Badan Lebih');
-                        }
+                        if ($data['value'] === 'sangat_kurang') $query->where('status_gizi', 'Berat Badan Sangat Kurang');
+                        elseif ($data['value'] === 'kurang') $query->where('status_gizi', 'Berat Badan Kurang');
+                        elseif ($data['value'] === 'normal') $query->where('status_gizi', 'Berat Badan Normal');
+                        elseif ($data['value'] === 'lebih') $query->where('status_gizi', 'Risiko Berat Badan Lebih');
                     }),
     
                 Tables\Filters\SelectFilter::make('status_stunting')
@@ -273,14 +297,12 @@ class PemeriksaanBayiResource extends Resource
                         'normal' => 'Normal',
                     ])
                     ->query(function ($query, array $data) {
-                        if ($data['value'] === 'stunting') {
-                            $query->whereIn('status_stunting', ['Sangat Pendek (Severely Stunted)', 'Pendek (Stunted)']);
-                        } elseif ($data['value'] === 'normal') {
-                            $query->where('status_stunting', 'Normal');
-                        }
+                        if ($data['value'] === 'stunting') $query->whereIn('status_stunting', ['Sangat Pendek (Severely Stunted)', 'Pendek (Stunted)']);
+                        elseif ($data['value'] === 'normal') $query->where('status_stunting', 'Normal');
                     }),
             ]) 
             ->actions([
+                // 🟢 TOMBOL AKSI CEPAT MEJA 2 (DENGAN INJEKSI Z-SCORE)
                 Tables\Actions\Action::make('isi_tb')
                     ->label('Isi TB')
                     ->icon('heroicon-o-arrows-up-down')
@@ -291,12 +313,36 @@ class PemeriksaanBayiResource extends Resource
                         Forms\Components\Select::make('cara_ukur')->label('Cara Ukur')->options(['berdiri' => 'Berdiri', 'terlentang' => 'Terlentang'])->required(),
                     ])
                     ->action(function (PemeriksaanBayi $record, array $data) {
-                        $record->update([
+                        $pasien = $record->pasien;
+                        $usia = $record->usia_bulan;
+                        $jk = $pasien ? $pasien->jenis_kelamin : 'L';
+                        
+                        $tbKoreksi = (float) $data['tinggi_badan'];
+                        if ($usia < 24 && $data['cara_ukur'] === 'berdiri') $tbKoreksi += 0.7;
+                        if ($usia >= 24 && $data['cara_ukur'] === 'terlentang') $tbKoreksi -= 0.7;
+
+                        $updateData = [
                             'tinggi_badan' => $data['tinggi_badan'],
                             'cara_ukur' => $data['cara_ukur'],
-                        ]);
+                        ];
+
+                        if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungTbu')) {
+                            $updateData['status_stunting'] = \App\Helpers\AntropometriHelper::hitungTbu($jk, $usia, $tbKoreksi);
+                        }
+                        if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungZScoreTBU')) {
+                            $zscoreTbu = \App\Helpers\AntropometriHelper::hitungZScoreTBU($jk, $usia, $tbKoreksi);
+                            $updateData['zscore_tbu'] = is_null($zscoreTbu) ? 0.00 : number_format($zscoreTbu, 2);
+                        }
+                        if (!empty($record->berat_badan) && method_exists(\App\Helpers\AntropometriHelper::class, 'hitungBbtb')) {
+                            $updateData['status_bbtb'] = \App\Helpers\AntropometriHelper::hitungBbtb($jk, $tbKoreksi, $record->berat_badan);
+                            $zscoreBbtb = \App\Helpers\AntropometriHelper::hitungZScoreBBTB($jk, $tbKoreksi, $record->berat_badan);
+                            $updateData['zscore_bbtb'] = is_null($zscoreBbtb) ? 0.00 : number_format($zscoreBbtb, 2);
+                        }
+
+                        $record->update($updateData);
                     }),
 
+                // 🟢 TOMBOL AKSI CEPAT MEJA 3
                 Tables\Actions\Action::make('isi_lk')
                     ->label('Isi LK & LiLA')
                     ->icon('heroicon-o-sparkles')
@@ -313,6 +359,7 @@ class PemeriksaanBayiResource extends Resource
                         ]);
                     }),
 
+                // 🟢 TOMBOL AKSI CEPAT MEJA 4 (DENGAN INJEKSI Z-SCORE)
                 Tables\Actions\Action::make('isi_bb')
                     ->label('Isi BB')
                     ->icon('heroicon-o-scale')
@@ -322,7 +369,31 @@ class PemeriksaanBayiResource extends Resource
                         Forms\Components\TextInput::make('berat_badan')->label('Berat Badan (Kg)')->required()->numeric(),
                     ])
                     ->action(function (PemeriksaanBayi $record, array $data) {
-                        $record->update(['berat_badan' => $data['berat_badan']]);
+                        $pasien = $record->pasien;
+                        $usia = $record->usia_bulan;
+                        $jk = $pasien ? $pasien->jenis_kelamin : 'L';
+
+                        $updateData = ['berat_badan' => $data['berat_badan']];
+
+                        if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungBbu')) {
+                            $updateData['status_gizi'] = \App\Helpers\AntropometriHelper::hitungBbu($jk, $usia, $data['berat_badan']);
+                        }
+                        if (method_exists(\App\Helpers\AntropometriHelper::class, 'hitungZScoreBBU')) {
+                            $zscoreBbu = \App\Helpers\AntropometriHelper::hitungZScoreBBU($jk, $usia, $data['berat_badan']);
+                            $updateData['zscore_bbu'] = is_null($zscoreBbu) ? 0.00 : number_format($zscoreBbu, 2);
+                        }
+
+                        if (!empty($record->tinggi_badan) && !empty($record->cara_ukur) && method_exists(\App\Helpers\AntropometriHelper::class, 'hitungBbtb')) {
+                            $tbKoreksi = (float) $record->tinggi_badan;
+                            if ($usia < 24 && $record->cara_ukur === 'berdiri') $tbKoreksi += 0.7;
+                            if ($usia >= 24 && $record->cara_ukur === 'terlentang') $tbKoreksi -= 0.7;
+
+                            $updateData['status_bbtb'] = \App\Helpers\AntropometriHelper::hitungBbtb($jk, $tbKoreksi, $data['berat_badan']);
+                            $zscoreBbtb = \App\Helpers\AntropometriHelper::hitungZScoreBBTB($jk, $tbKoreksi, $data['berat_badan']);
+                            $updateData['zscore_bbtb'] = is_null($zscoreBbtb) ? 0.00 : number_format($zscoreBbtb, 2);
+                        }
+
+                        $record->update($updateData);
                     }),
 
                 Tables\Actions\EditAction::make()
