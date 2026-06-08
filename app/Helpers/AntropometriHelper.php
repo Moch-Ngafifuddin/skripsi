@@ -141,4 +141,62 @@ class AntropometriHelper
         if ($zscore > 2 && $zscore <= 3) return 'Gizi Lebih (Overweight)';
         return 'Obesitas (Obese)';
     }
+
+    public static function hitungKBM($pasienId, $usiaBulan, $beratSekarang)
+    {
+        // 1. Standar KBM Buku KIA Kemenkes (dalam satuan Kilogram)
+        $daftarKbm = [
+            1 => 0.8, // Usia 1 bulan, KBM harus naik min 800gr
+            2 => 0.9, // Usia 2 bulan, KBM harus naik min 900gr
+            3 => 0.8, // Usia 3 bulan, KBM harus naik min 800gr
+            4 => 0.6, // Usia 4 bulan, KBM harus naik min 600gr
+            5 => 0.5, // Usia 5 bulan, KBM harus naik min 500gr
+            6 => 0.4, // Usia 6 bulan, KBM harus naik min 400gr
+            7 => 0.3, 8 => 0.3, 9 => 0.3, 10 => 0.3, 11 => 0.3, // 7-11 bulan min 300gr
+        ];
+
+        // Usia 12-59 bulan target KBM-nya flat di 0.2 kg (200gr)
+        $targetKbm = $usiaBulan >= 12 ? 0.2 : ($daftarKbm[$usiaBulan] ?? 0.2);
+
+        // Jika ini adalah penimbangan pertama kali (bulan ke-0 / Baru Lahir)
+        if ($usiaBulan == 0) {
+            return [
+                'kenaikan_bb' => 'naik',
+                'keterangan_bb' => 'Pemeriksaan awal / berat lahir awal (Bulan ke-0)',
+            ];
+        }
+
+        // 2. Cari data penimbangan bulan sebelumnya (usia saat ini - 1)
+        $pemeriksaanBulanLalu = PemeriksaanBayi::where('pasien_id', $pasienId)
+            ->where('usia_bulan', $usiaBulan - 1)
+            ->first();
+
+        // Jika bulan lalu tidak datang menimbang, otomatis statusnya "T" (Tidak Naik) menurut Kemenkes
+        if (!$pemeriksaanBulanLalu) {
+            return [
+                'kenaikan_bb' => 'tidak naik',
+                'keterangan_bb' => 'Bulan lalu tidak menimbang (Status: T)',
+            ];
+        }
+
+        $beratLalu = (float) $pemeriksaanBulanLalu->berat_badan;
+        $selisih = $beratSekarang - $beratLalu;
+
+        // 3. Evaluasi Target KBM
+        if ($selisih >= $targetKbm) {
+            return [
+                'kenaikan_bb' => 'nair', // disimpan lowercase agar sinkron dengan kondisi warna di blade Anda
+                'keterangan_bb' => "Naik (N). Naik +" . ($selisih * 1000) . "g (Target KBM +" . ($targetKbm * 1000) . "g)",
+            ];
+        } else {
+            $pesan = $selisih < 0 
+                ? "Tidak Naik (T). BB Turun " . ($selisih * 1000) . "g" 
+                : "Tidak Naik (T). Hanya naik +" . ($selisih * 1000) . "g (Kurang dari KBM +" . ($targetKbm * 1000) . "g)";
+                
+            return [
+                'kenaikan_bb' => 'tidak naik',
+                'keterangan_bb' => $pesan,
+            ];
+        }
+    }
 }

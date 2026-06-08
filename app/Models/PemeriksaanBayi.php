@@ -50,6 +50,34 @@ class PemeriksaanBayi extends Model
     
     protected static function booted()
     {
+        static::creating(function ($model) {
+            if ($model->pasien_id && $model->usia_bulan !== null && $model->berat_badan) {
+                $hasilKbm = AntropometriHelper::hitungKBM(
+                    $model->pasien_id, 
+                    $model->usia_bulan, 
+                    (float) $model->berat_badan
+                );
+
+                $model->kenaikan_bb = $hasilKbm['kenaikan_bb'];
+                $model->keterangan_bb = $hasilKbm['keterangan_bb'];
+            }
+        });
+
+        // Otomatis hitung kembali jika data berat badan diedit/diubah
+        static::updating(function ($model) {
+            if ($model->pasien_id && $model->usia_bulan !== null && $model->berat_badan) {
+                $hasilKbm = AntropometriHelper::hitungKBM(
+                    $model->pasien_id, 
+                    $model->usia_bulan, 
+                    (float) $model->berat_badan
+                );
+
+                $model->kenaikan_bb = $hasilKbm['kenaikan_bb'];
+                $model->keterangan_bb = $hasilKbm['keterangan_bb'];
+            }
+        });
+
+        
         static::saving(function ($model) {
             $pasien = Pasien::find($model->pasien_id);
             

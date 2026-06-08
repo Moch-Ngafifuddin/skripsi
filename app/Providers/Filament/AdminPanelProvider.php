@@ -35,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('admin')
+            ->favicon(asset('logo_kecil.svg'))
             ->path('')
             ->login(CustomLogin::class)
             ->colors([

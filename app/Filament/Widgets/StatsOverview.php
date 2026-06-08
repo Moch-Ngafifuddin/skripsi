@@ -45,31 +45,41 @@ class StatsOverview extends BaseWidget
                 ->description('Kategori Pendek & Sangat Pendek')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color(($metrics->stunting ?? 0) > 0 ? 'danger' : 'success')
-                ->url($resourceUrl . '?tableFilters[status_stunting][value]=stunting'),
+                ->url(route('filament.admin.resources.pemeriksaan-bayis.index', [
+                    'tableFilters[status_stunting][value]' => 'Pendek'
+                ])),
 
             Stat::make('Gizi Buruk', ($metrics->gizi_buruk ?? 0) . ' Anak')
                 ->description('Berat Badan Sangat Kurang')
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color(($metrics->gizi_buruk ?? 0) > 0 ? 'danger' : 'success')
-                ->url($resourceUrl . '?tableFilters[status_gizi][value]=sangat_kurang'),
+                ->url(route('filament.admin.resources.pemeriksaan-bayis.index', [
+                    'tableFilters[status_gizi][value]' => 'Gizi Buruk'
+                ])),
 
             Stat::make('Berat Badan Kurang', ($metrics->bb_kurang ?? 0) . ' Anak')
                 ->description('Kategori BB Kurang')
                 ->descriptionIcon('heroicon-m-minus-circle')
                 ->color(($metrics->bb_kurang ?? 0) > 0 ? 'warning' : 'success')
-                ->url($resourceUrl . '?tableFilters[status_gizi][value]=kurang'),
+                ->url(route('filament.admin.resources.pemeriksaan-bayis.index', [
+                    'tableFilters[status_gizi][value]' => 'kurang'
+                ])),
 
             Stat::make('Gizi Normal', ($metrics->gizi_normal ?? 0) . ' Anak')
                 ->description('Berat Badan Sehat & Ideal')
                 ->descriptionIcon('heroicon-m-check-circle')
                 ->color('success')
-                ->url($resourceUrl . '?tableFilters[status_gizi][value]=normal'),
+                ->url(route('filament.admin.resources.pemeriksaan-bayis.index', [
+                    'tableFilters[status_gizi][value]' => 'normal'
+                ])),
 
             Stat::make('Risiko Obesitas', ($metrics->gizi_lebih ?? 0) . ' Anak')
                 ->description('Risiko Berat Badan Lebih')
                 ->descriptionIcon('heroicon-m-plus')
                 ->color(($metrics->gizi_lebih ?? 0) > 0 ? 'warning' : 'success')
-                ->url($resourceUrl . '?tableFilters[status_gizi][value]=lebih'),
+                ->url(route('filament.admin.resources.pemeriksaan-bayis.index', [
+                    'tableFilters[status_gizi][value]' => 'lebih'
+                ])),
         ];
     }
 }

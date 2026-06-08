@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Filament\Resources;
+use Filament\Forms\Components\Select;
+use Filament\Tables\Filters\Filter;
 use Carbon\Carbon;
 use App\Models\Pasien;
 use App\Filament\Resources\PemeriksaanBayiResource\Pages;
@@ -11,6 +13,9 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Builder;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Filters\SelectFilter;
 
 class PemeriksaanBayiResource extends Resource
 {
@@ -262,7 +267,14 @@ class PemeriksaanBayiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['pasien']))
+                ->modifyQueryUsing(fn ($query) => $query
+                ->with(['pasien'])
+                ->whereIn('pemeriksaan_bayi.id', function ($subQuery) {
+                    $subQuery->selectRaw('MAX(id)')
+                        ->from('pemeriksaan_bayi')
+                        ->groupBy('pasien_id');
+                })
+                )
             ->columns([
                 Tables\Columns\TextColumn::make('pasien.nama')->label('Nama Balita')->searchable(),
                 Tables\Columns\TextColumn::make('keterangan_umur')->label('Usia')->badge()->color('success'),
@@ -298,6 +310,45 @@ class PemeriksaanBayiResource extends Resource
                     ->query(function ($query, array $data) {
                         if ($data['value'] === 'stunting') $query->whereIn('status_stunting', ['Sangat Pendek (Severely Stunted)', 'Pendek (Stunted)']);
                         elseif ($data['value'] === 'normal') $query->where('status_stunting', 'Normal');
+                    }),
+                    Filter::make('tgl_periksa_range')
+                    ->label('Periode Pemeriksaan')
+                    ->form([
+                        Select::make('quick_period')
+                            ->label('Pilihan Periode Cepat')
+                            ->options([
+                                'this_week' => 'Minggu Ini',
+                                'this_month' => 'Bulan Ini',
+                                'this_year' => 'Tahun Ini',
+                            ],)->reactive()
+                            ->afterStateUpdated(function ($state, $set) {
+                                // Jika kader memilih opsi cepat, otomatis isi range tanggal di bawahnya
+                                if ($state === 'this_week') {
+                                    $set('dari_tanggal', Carbon::now()->startOfWeek()->format('Y-m-d'));
+                                    $set('sampai_tanggal', Carbon::now()->endOfWeek()->format('Y-m-d'));
+                                } elseif ($state === 'this_month') {
+                                    $set('dari_tanggal', Carbon::now()->startOfMonth()->format('Y-m-d'));
+                                    $set('sampai_tanggal', Carbon::now()->endOfMonth()->format('Y-m-d'));
+                                } elseif ($state === 'this_year') {
+                                    $set('dari_tanggal', Carbon::now()->startOfYear()->format('Y-m-d'));
+                                    $set('sampai_tanggal', Carbon::now()->endOfYear()->format('Y-m-d'));
+                                }
+                            }),
+                        DatePicker::make('dari_tanggal')
+                            ->label('Dari Tanggal'),
+                        DatePicker::make('sampai_tanggal')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['dari_tanggal'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('tgl_periksa', '>=', $date),
+                            )
+                            ->when(
+                                $data['sampai_tanggal'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('tgl_periksa', '<=', $date),
+                            );
                     }),
             ]) 
             ->actions([
@@ -412,6 +463,13 @@ class PemeriksaanBayiResource extends Resource
             'create' => Pages\CreatePemeriksaanBayi::route('/create'),
             'edit' => Pages\EditPemeriksaanBayi::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        // Menggunakan ::with(['pasien']) memaksa Laravel menggunakan Eager Loading.
+        // Hanya akan terjadi 2 Query SQL ke database berapapun baris data yang difilter!
+        return parent::getEloquentQuery()->with(['pasien']);
     }
 
     public static function canCreate(): bool
