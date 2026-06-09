@@ -31,8 +31,8 @@ class LayananFonnte
         }
 
         try {
-            //$response = Http::withHeaders([
-                $response = Http::withoutVerifying()->withHeaders([
+            $response = Http::withHeaders([
+                //$response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => $token,
             ])
             ->post('https://api.fonnte.com/send', [

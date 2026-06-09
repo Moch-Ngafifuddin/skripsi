@@ -11,6 +11,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use Filament\Forms\Get;
+use Laravolt\Indonesia\Models\Province;
+use Laravolt\Indonesia\Models\City;
+use Laravolt\Indonesia\Models\District;
+use Laravolt\Indonesia\Models\Village;
 
 class PasienResource extends Resource
 {
@@ -51,10 +55,20 @@ class PasienResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('anak_ke')->label('Anak Ke-')->numeric(),
                         Forms\Components\TextInput::make('usia_kehamilan')->label('Usia Kehamilan Saat Lahir (Minggu)')->numeric(),
-                        Forms\Components\TextInput::make('berat_lahir')->label('Berat Lahir (Kg)')->numeric()->live(onBlur: true)->helperText('Gunakan titik, misal: 2.4'),
+                        Forms\Components\TextInput::make('berat_lahir')->label('Berat Lahir (Kg)')->numeric()->live()->helperText('Gunakan titik, misal: 2.4'),
                         Forms\Components\TextInput::make('panjang_lahir')->label('Panjang Lahir (Cm)')->numeric(),
                         Forms\Components\TextInput::make('lingkar_kepala_lahir')->label('Lingkar Kepala Lahir (Cm)')->numeric(),
                         Forms\Components\Toggle::make('imd')->label('Inisiasi Menyusu Dini (IMD)')->inline(false),
+                        Forms\Components\Select::make('riwayat_asi')
+                        ->label('Riwayat ASI Eksklusif')
+                            ->options([
+                                'E1' => 'E1 (ASI Eksklusif 1 Bulan)',
+                                'E2' => 'E2 (ASI Eksklusif 2 Bulan)',
+                                'E3' => 'E3 (ASI Eksklusif 3 Bulan)',
+                                'E4' => 'E4 (ASI Eksklusif 4 Bulan)',
+                                'E5' => 'E5 (ASI Eksklusif 5 Bulan)',
+                                'E6' => 'E6 (ASI Eksklusif 6 Bulan)',
+                            ]),
 
                         Forms\Components\Fieldset::make('Tatalaksana BBLR & Prematur')
                             ->visible(fn (Get $get) => is_numeric($get('berat_lahir')) && (float) $get('berat_lahir') < 2.5)
@@ -69,17 +83,99 @@ class PasienResource extends Resource
                         Forms\Components\Group::make([
                             Forms\Components\TextInput::make('nama_ibu')->label('Nama Ibu'),
                             Forms\Components\TextInput::make('nik_ibu')->label('NIK Ibu')->numeric()->maxLength(16),
+                            Forms\Components\TextInput::make('pendidikan_pekerjaan_ibu')->label('Pendidikan/Pekerjaan Ibu'),
                             Forms\Components\TextInput::make('nama_ayah')->label('Nama Ayah'),
                             Forms\Components\TextInput::make('nik_ayah')->label('NIK Ayah')->numeric()->maxLength(16),
+                            Forms\Components\TextInput::make('pendidikan_pekerjaan_ayah')->label('Pendidikan/Pekerjaan Ayah'),
+                            Forms\Components\TextInput::make('nama_wali')->label('Nama Wali (Jika Ada)'),
                         ])->columns(2),
 
                         Forms\Components\Grid::make(3)->schema([
-                            Forms\Components\Select::make('provinsi')->label('Provinsi')->options(['Jawa Tengah' => 'Jawa Tengah', 'Jawa Barat' => 'Jawa Barat']),
-                            Forms\Components\TextInput::make('kabupaten')->label('Kabupaten/Kota'),
-                            Forms\Components\TextInput::make('kecamatan')->label('Kecamatan'),
-                            Forms\Components\TextInput::make('desa_kelurahan')->label('Desa/Kelurahan'),
-                            Forms\Components\TextInput::make('nama_puskesmas')->label('Nama Puskesmas'),
-                            Forms\Components\TextInput::make('nama_posyandu')->label('Nama Posyandu'),
+                            // 1. Dropdown Provinsi (Default dari Akun Login, Bisa Diubah)
+                            Forms\Components\Select::make('provinsi')
+                                ->label('Provinsi')
+                                ->options(fn () => Province::pluck('name', 'name'))
+                                ->default(fn () => auth()->user()?->provinsi) // Auto-fill dari profil user login
+                                ->searchable()
+                                ->live()
+                                ->required()
+                                ->afterStateUpdated(function (Forms\Set $set) {
+                                    // Jika provinsi diganti, kosongkan semua field di bawahnya agar tidak terjadi mismatch data
+                                    $set('kabupaten', null);
+                                    $set('kecamatan', null);
+                                    $set('desa_kelurahan', null);
+                                }),
+                        
+                            // 2. Dropdown Kabupaten/Kota (Default dari Akun Login, Bisa Diubah)
+                            Forms\Components\Select::make('kabupaten')
+                                ->label('Kabupaten/Kota')
+                                ->options(function (Get $get) {
+                                    $provinsiNama = $get('provinsi');
+                                    if (! $provinsiNama) return [];
+                        
+                                    $province = Province::where('name', $provinsiNama)->first();
+                                    return $province ? City::where('province_code', $province->code)->pluck('name', 'name') : [];
+                                })
+                                ->default(fn () => auth()->user()?->kabupaten_kota) // Auto-fill dari profil user login
+                                ->searchable()
+                                ->live()
+                                ->required()
+                                ->afterStateUpdated(function (Forms\Set $set) {
+                                    // Jika kabupaten diganti, kosongkan kecamatan & desa di bawahnya
+                                    $set('kecamatan', null);
+                                    $set('desa_kelurahan', null);
+                                }),
+                        
+                            // 3. Dropdown Kecamatan (Default dari Akun Login, Bisa Diubah)
+                            Forms\Components\Select::make('kecamatan')
+                                ->label('Kecamatan')
+                                ->options(function (Get $get) {
+                                    $kabupatenNama = $get('kabupaten');
+                                    $provinsiNama = $get('provinsi');
+                                    if (! $kabupatenNama || ! $provinsiNama) return [];
+                        
+                                    $province = Province::where('name', $provinsiNama)->first();
+                                    if (! $province) return [];
+                        
+                                    $city = City::where('name', $kabupatenNama)->where('province_code', $province->code)->first();
+                                    return $city ? District::where('city_code', $city->code)->pluck('name', 'name') : [];
+                                })
+                                ->default(fn () => auth()->user()?->kecamatan) // Auto-fill dari profil user login
+                                ->searchable()
+                                ->live()
+                                ->required()
+                                ->afterStateUpdated(fn (Forms\Set $set) => $set('desa_kelurahan', null)), // Jika kecamatan diganti, kosongkan desa
+                        
+                            // 4. Dropdown Desa/Kelurahan (Default dari Akun Login, Bisa Diubah)
+                            Forms\Components\Select::make('desa_kelurahan')
+                                ->label('Desa/Kelurahan')
+                                ->options(function (Get $get) {
+                                    $kecamatanNama = $get('kecamatan');
+                                    $kabupatenNama = $get('kabupaten');
+                                    $provinsiNama = $get('provinsi');
+                                    if (! $kecamatanNama || ! $kabupatenNama || ! $provinsiNama) return [];
+                        
+                                    $province = Province::where('name', $provinsiNama)->first();
+                                    if (! $province) return [];
+                        
+                                    $city = City::where('name', $kabupatenNama)->where('province_code', $province->code)->first();
+                                    if (! $city) return [];
+                        
+                                    $district = District::where('name', $kecamatanNama)->where('city_code', $city->code)->first();
+                                    return $district ? Village::where('district_code', $district->code)->pluck('name', 'name') : [];
+                                })
+                                ->default(fn () => auth()->user()?->desa_kelurahan) // Auto-fill dari profil user login
+                                ->searchable()
+                                ->required(),
+                        
+                            // 5. Nama Puskesmas & Posyandu (Auto-fill dari Akun Login, Bisa Diubah)
+                            Forms\Components\TextInput::make('nama_puskesmas')
+                                ->label('Nama Puskesmas')
+                                ->default(fn () => auth()->user()?->nama_puskesmas),
+                        
+                            Forms\Components\TextInput::make('nama_posyandu')
+                                ->label('Nama Posyandu')
+                                ->default(fn () => auth()->user()?->nama_posyandu),
                         ]),
 
                         Forms\Components\Grid::make(4)->schema([
@@ -99,7 +195,7 @@ class PasienResource extends Resource
                 Tables\Columns\TextColumn::make('nik')
                 ->label('NIK')
                 ->searchable(query: function ($query, $search) {
-                    $query->orWhere('nik_hash', hash('sha256', $search));
+                    $query->orWhere('nik_hash', hash_hmac('sha256', $search, config('app.key')));
                 }),
                 Tables\Columns\TextColumn::make('nama')->label('Nama Balita')->searchable(),
                 Tables\Columns\TextColumn::make('jenis_kelamin')->label('L/P'),

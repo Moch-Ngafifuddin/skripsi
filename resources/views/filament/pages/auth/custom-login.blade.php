@@ -129,13 +129,7 @@
                         :full-width="true"
                     />
                 </div>
-
-                {{-- Loading State --}}
-                <div wire:loading.flex wire:target="authenticate" class="items-center justify-center gap-2 mt-4 text-sm text-slate-500">
-                    <div class="loading-spinner"></div>
-                    <span>Memverifikasi akun...</span>
-                </div>
-
+                
             </x-filament-panels::form>
         </div>
 

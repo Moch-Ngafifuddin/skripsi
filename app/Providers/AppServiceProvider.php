@@ -25,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
     public function saving(Pasien $pasien): void
     {
         if ($pasien->isDirty('nik')) {
-            $pasien->nik_hash = $pasien->nik ? hash('sha256', $pasien->nik) : null;
+            $pasien->nik_hash = $pasien->nik ? hash_hmac('sha256', $pasien->nik) : null;
         }
     }
 }

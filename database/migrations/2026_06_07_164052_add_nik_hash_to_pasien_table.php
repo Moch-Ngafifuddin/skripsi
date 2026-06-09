@@ -11,9 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('pasien', function (Blueprint $table) {
-            $table->string('nik_hash', 64)->nullable()->index(); 
-        });
+        // PENCEGAHAN ERROR: Cek dulu apakah kolom 'nik_hash' sudah ada di tabel pasien
+        if (!Schema::hasColumn('pasien', 'nik_hash')) {
+            Schema::table('pasien', function (Blueprint $table) {
+                $table->string('nik_hash', 64)->nullable()->index(); 
+            });
+        }
     }
 
     /**
@@ -22,7 +25,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('pasien', function (Blueprint $table) {
-            //
+            // Rollback aman: Hapus kolom jika memang ada
+            if (Schema::hasColumn('pasien', 'nik_hash')) {
+                $table->dropColumn('nik_hash');
+            }
         });
     }
 };

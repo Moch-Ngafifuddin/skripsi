@@ -38,46 +38,10 @@ return new class extends Migration
             $table->string('status_stunting')->nullable();
             $table->timestamps();
         });
-
-        // 3. Tabel Pemeriksaan Remaja
-        Schema::create('pemeriksaan_remaja', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('pasien_id')->constrained('pasien')->cascadeOnDelete();
-            $table->date('tgl_periksa');
-            $table->decimal('berat_badan', 5, 2)->nullable();
-            $table->decimal('tinggi_badan', 5, 2)->nullable();
-            $table->integer('sistole')->nullable();
-            $table->integer('diastole')->nullable();
-            $table->decimal('kadar_hb', 4, 1)->nullable();
-            $table->decimal('lingkar_lengan', 5, 2)->nullable();
-            $table->boolean('minum_ttd')->default(false);
-            $table->text('keluhan')->nullable();
-            $table->timestamps();
-        });
-
-        // 4. Tabel Pemeriksaan Lansia
-        Schema::create('pemeriksaan_lansia', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('pasien_id')->constrained('pasien')->cascadeOnDelete();
-            $table->date('tgl_periksa');
-            $table->decimal('berat_badan', 5, 2)->nullable();
-            $table->decimal('tinggi_badan', 5, 2)->nullable();
-            $table->decimal('lingkar_perut', 5, 2)->nullable();
-            $table->integer('sistole');
-            $table->integer('diastole');
-            $table->integer('gula_darah')->nullable();
-            $table->decimal('kolesterol', 5, 2)->nullable();
-            $table->decimal('asam_urat', 4, 2)->nullable();
-            $table->text('riwayat_penyakit')->nullable();
-            $table->text('tindakan')->nullable();
-            $table->timestamps();
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('pemeriksaan_lansia');
-        Schema::dropIfExists('pemeriksaan_remaja');
         Schema::dropIfExists('pemeriksaan_bayi');
         Schema::dropIfExists('pasien');
     }
