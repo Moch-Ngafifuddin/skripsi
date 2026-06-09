@@ -31,14 +31,14 @@ class DatabaseBalitaResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query
+                ->modifyQueryUsing(fn ($query) => $query
                 ->with(['pasien'])
                 ->whereHas('pasien', fn ($q) => $q->where('is_arsip', 0))
-                ->whereIn('pemeriksaan_bayi.id', function ($subQuery) {
-                    $subQuery->selectRaw('MAX(id)')
-                        ->from('pemeriksaan_bayi')
-                        ->groupBy('pasien_id');
-                })
+                ->whereRaw('pemeriksaan_bayi.id IN (
+                    SELECT MAX(pb.id) 
+                    FROM pemeriksaan_bayi pb 
+                    GROUP BY pb.pasien_id
+                )')
             )
 
             ->headerActions([
