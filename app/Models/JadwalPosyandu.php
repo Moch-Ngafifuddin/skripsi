@@ -31,7 +31,13 @@ class JadwalPosyandu extends Model
         'is_aktif',
         'waktu_acara',
         'tempat_acara',
+        'template_id',
     ];
+
+    public function templatePesan()
+    {
+        return $this->belongsTo(\App\Models\TemplatePesan::class, 'template_id');
+    }
 
     /**
      * Memetakan konversi tipe data kolom (Casting) secara otomatis.

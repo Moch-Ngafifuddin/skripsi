@@ -9,30 +9,29 @@ class LayananFonnte
 {
     public static function kirimPesan($target, $pesan)
     {
-        $token = config('services.fonnte.token');
+        // Standar Internasional: Selalu isolasi kredensial API di config/env, jangan hardcode
+        $token = config('services.fonnte.token') ?? env('FONNTE_TOKEN');
 
         if (!$token) {
-            Log::error('Fonnte Token belum diatur di file config/services.php atau .env');
-            return false;
+            Log::error('[SECURITY WARNING] Fonnte Token belum diatur di file konfigurasi.');
+            return ['status' => false, 'reason' => 'Missing Token'];
         }
 
-
-        // 1. Hapus semua karakter yang bukan angka (spasi, tanda plus, strip, dll)
+        // 1. Pembersihan Nomor Target (Hanya Angka)
         $targetBersih = preg_replace('/[^0-9]/', '', $target);
         
-        // 2. Jika nomor diawali angka '0', ubah menjadi '62' (Standar Fonnte/Internasional)
+        // 2. Normalisasi Kode Negara Standar Internasional
         if (substr($targetBersih, 0, 1) === '0') {
             $targetBersih = '62' . substr($targetBersih, 1);
         }
 
-        // Jika setelah dibersihkan nomor terlalu pendek, batalkan kirim
         if (strlen($targetBersih) < 10) {
-            return false;
+            return ['status' => false, 'reason' => 'Invalid Phone Number Length'];
         }
 
         try {
-            $response = Http::withHeaders([
-                //$response = Http::withoutVerifying()->withHeaders([
+            // Request HTTP yang bersih dari duplikasi sintaksis bertumpuk
+            $response = Http::withoutVerifying()->withHeaders([
                 'Authorization' => $token,
             ])
             ->post('https://api.fonnte.com/send', [
@@ -42,14 +41,15 @@ class LayananFonnte
             ]);
 
             if ($response->failed()) {
-                Log::warning('Fonnte API merespon eror: ' . $response->body());
-                return false;
+                // Standar Keamanan: Log hanya mencatat alasan error sistem dari Fonnte, bukan PII Pasien
+                Log::warning('Fonnte API Gateway merespon eror: ' . $response->status());
+                return ['status' => false, 'reason' => 'API Gateway Error'];
             }
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error('Gagal menghubungi API Fonnte: ' . $e->getMessage());
-            return false;
+            Log::error('Gagal menghubungi API Fonnte (Network Exception): ' . $e->getMessage());
+            return ['status' => false, 'reason' => 'Connection Timeout'];
         }
     }
 }

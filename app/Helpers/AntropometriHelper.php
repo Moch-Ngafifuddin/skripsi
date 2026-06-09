@@ -5,6 +5,7 @@ namespace App\Helpers;
 use App\Models\MasterBbu;
 use App\Models\MasterTbu;
 use App\Models\MasterBbtb;
+use App\Models\PemeriksaanBayi;
 use Illuminate\Support\Facades\Cache;
 
 class AntropometriHelper

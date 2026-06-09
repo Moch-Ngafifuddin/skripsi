@@ -26,6 +26,8 @@ class PemeriksaanBayi extends Model
         'zscore_bbu',
         'zscore_tbu',
         'kenaikan_bb',
+        'status_bbtb',
+        'zscore_bbtb',
         'keterangan_bb',
         'pitting_edema',
         'vitamin_a',
