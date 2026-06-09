@@ -7,6 +7,7 @@ use App\Models\JadwalPosyandu;
 use App\Models\Pasien;
 use App\Services\LayananFonnte;
 use Carbon\Carbon;
+use App\Jobs\ProsesKirimWa;
 
 class KirimPengingatPosyandu extends Command
 {

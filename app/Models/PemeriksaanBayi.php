@@ -79,7 +79,8 @@ class PemeriksaanBayi extends Model
 
         
         static::saving(function ($model) {
-            $pasien = Pasien::find($model->pasien_id);
+            //$pasien = Pasien::find($model->pasien_id);
+            $pasien = $model->pasien ?? Pasien::find($model->pasien_id);
             
             if ($pasien && $model->berat_badan && $model->tinggi_badan) {
                 // Koreksi toleransi Cara Ukur berdasarkan PMK No.2 Tahun 2020

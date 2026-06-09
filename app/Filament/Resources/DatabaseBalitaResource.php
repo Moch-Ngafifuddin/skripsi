@@ -106,14 +106,19 @@ class DatabaseBalitaResource extends Resource
                         $sampaiTanggal = $activeFilters['tgl_periksa_range']['sampai_tanggal'] ?? null;
 
                         // 3. Bangun Link Download Dinamis memanfaatkan url dasar sistem Anda
-                        $linkDownload = route('download.excel.wa', [
-                            'status_gizi' => $statusGizi,
-                            'status_stunting' => $statusStunting,
-                            'dari' => $dariTanggal,
-                            'sampai' => $sampaiTanggal,
-                        ]);
+                        $linkDownload = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                            'download.excel.wa',
+                            now()->addHours(24),
+                            [
+                                'status_gizi' => $statusGizi,
+                                'status_stunting' => $statusStunting,
+                                'dari' => $dariTanggal,
+                                'sampai' => $sampaiTanggal,
+                            ]
+                        );
 
                         // Hitung statistik rincian data kasus
+                        $baseQuery = $livewire->getFilteredTableQuery();
                         $giziBuruk = $records->where('status_gizi', 'Gizi Buruk')->count();
                         $bbKurang  = $records->where('status_gizi', 'Gizi Kurang')->count();
                         $giziNormal = $records->where('status_gizi', 'Gizi Baik (Normal)')->count();
@@ -143,6 +148,7 @@ class DatabaseBalitaResource extends Resource
 
                         // 📲 KIRIM DATA VIA SERVICE FONNTE
                         $kirim = \App\Services\LayananFonnte::kirimPesan($data['nomor_wa_admin'], $pesan);
+
 
                         // 🔔 SINKRONISASI NOTIFIKASI TOAST FILAMENT
                         if ($kirim) {

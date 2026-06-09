@@ -23,12 +23,12 @@ class Pasien extends Model
         return $this->hasMany(PemeriksaanBayi::class, 'pasien_id', 'id');
     }
 
+
     protected static function booted()
     {
         static::saving(function ($pasien) {
-            // Jika NIK diisi/diubah, otomatis generate hash-nya
             if ($pasien->isDirty('nik')) {
-                $pasien->nik_hash = $pasien->nik ? hash('sha256', $pasien->nik) : null;
+                $pasien->nik_hash = $pasien->nik ? hash_hmac('sha256', $pasien->nik, config('app.key')) : null;
             }
         });
     }

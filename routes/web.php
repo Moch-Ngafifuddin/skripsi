@@ -17,7 +17,10 @@ Route::get('/laporan/download/{id}', [LaporanPdfController::class, 'downloadLapo
     ->middleware('signed');
 
 // 📥 Route khusus unduhan Excel via link WhatsApp (100% Sinkron Hanya Balita Aktif)
-Route::get('/download-excel-wa', function (Request $request) {
+Route::get('/download-excel-wa', function (\Illuminate\Http\Request $request) {
+    if (! $request->hasValidSignature()) {
+        abort(403, 'Tautan unduhan tidak valid, telah dimanipulasi, atau sudah kedaluwarsa.');
+    }
     
     // 🔴 REVISI: Tambahkan filter 'whereHas' agar balita Pindah/Meninggal (is_arsip=1) TIDAK IKUT TERDOWNLOAD
     $query = PemeriksaanBayi::with(['pasien'])
@@ -50,4 +53,4 @@ Route::get('/download-excel-wa', function (Request $request) {
         new DatabaseBalitaExport($records), 
         'database_balita_wa_' . now()->format('Ymd_His') . '.xlsx'
     );
-})->name('download.excel.wa');
+})->name('download.excel.wa')->middleware('signed');
