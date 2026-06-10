@@ -7,6 +7,7 @@ use App\Models\JadwalPosyandu;
 use App\Models\Pasien;
 use App\Services\LayananFonnte;
 use Carbon\Carbon;
+use App\Jobs\ProsesKirimWa;
 
 class KirimPengingatPosyandu extends Command
 {
@@ -68,7 +69,9 @@ class KirimPengingatPosyandu extends Command
                 $noHpMasking = substr($noHp, 0, 4) . '****' . substr($noHp, -4);
 
                 // Eksekusi kirim via Fonnte
-                $proses = LayananFonnte::kirimPesan($noHp, $pesanFinal);
+                ProsesKirimWa::dispatch($noHp, $pesanFinal);
+                $totalTerkirim++;
+                $this->info("   [QUEUE] Pesan untuk target {$namaMasking} berhasil dimasukkan ke antrean sistem.");
                 
                 if (is_array($proses) && isset($proses['status']) && $proses['status'] === true) {
                     $totalTerkirim++;

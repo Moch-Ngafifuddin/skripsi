@@ -12,7 +12,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use App\Models\Pasien;
 use App\Models\TemplatePesan;
-use App\Services\LayananFonnte;
+use App\Jobs\ProsesKirimWa; // Mengintegrasikan file Job Antrean
 use Carbon\Carbon;
 
 class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
@@ -66,7 +66,6 @@ class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
                                 }
                             }),
 
-                        // INPUTAN VARIABEL BARU
                         DatePicker::make('tanggal_kegiatan')
                             ->label('Tanggal Jadwal Pelayanan')
                             ->default(now())
@@ -82,16 +81,13 @@ class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
                             ->helperText('Jangan hapus kode {tanggal} dan {lokasi} karena akan otomatis diganti oleh sistem.')
                             ->rows(8)
                             ->required(),
-                    ])->columns(2), // Dibagi menjadi 2 kolom agar rapi
+                    ])->columns(2),
             ])
             ->statePath('data');
     }
 
     public function eksekusiKirim(): void
     {
-
-        set_time_limit(0); 
-        
         $formData = $this->form->getState();
         $kategori = $formData['target_kategori'];
         $pesanMentah = $formData['isi_pesan'];
@@ -99,50 +95,47 @@ class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
         $tanggalFormat = Carbon::parse($formData['tanggal_kegiatan'])->translatedFormat('l, d F Y');
         $lokasiFormat = $formData['lokasi_kegiatan'];
 
-        // Tarik Data Pasien
-        $query = Pasien::query();
+        // 1. Inisialisasi Query Pasien Aktif
+        $query = Pasien::query()->where('is_arsip', 0);
 
-        // Mengambil pasien yang nomor HP-nya tidak kosong (Asumsi tabel Pasien adalah data anak balita)
+        // 2. SOLUSI BUG 1: Memproses Filter Kategori Sesuai Pilihan UI
+        if ($kategori !== 'semua') {
+            // Catatan: Sesuaikan nama kolom penanda kategori pada tabel pasien Anda (misal: 'kategori' atau 'jenis_pasien')
+            $query->where('kategori', $kategori); 
+        }
+
+        // Ambil pasien yang nomor HP-nya tidak kosong
         $pasiens = $query->whereNotNull('no_hp')->where('no_hp', '!=', '')->get();
 
         if ($pasiens->count() === 0) {
             Notification::make()
                 ->title('Gagal Mengirim')
-                ->body('Tidak ditemukan nomor HP aktif di database.')
+                ->body('Tidak ditemukan nomor HP aktif untuk kategori target tersebut di database.')
                 ->danger()
                 ->send();
             return;
         }
 
-        $suksesKirim = 0;
+        $totalAntrean = 0;
         
         foreach ($pasiens as $pasien) {
             $pesanFinal = str_replace('{nama}', $pasien->nama, $pesanMentah);
             $pesanFinal = str_replace('{tanggal}', $tanggalFormat, $pesanFinal);
             $pesanFinal = str_replace('{lokasi}', $lokasiFormat, $pesanFinal);
 
-            $proses = LayananFonnte::kirimPesan($pasien->no_hp, $pesanFinal);
-            
-            // Fonnte API biasanya mengembalikan array 'status' bertipe boolean
-            if (is_array($proses) && isset($proses['status']) && $proses['status'] === true) {
-                $suksesKirim++;
-            }
+            // SOLUSI BUG 2: Alihkan dari synchronous API ke Queue Job Asinkronus
+            ProsesKirimWa::dispatch($pasien->no_hp, $pesanFinal);
+            $totalAntrean++;
         }
 
-        if ($suksesKirim > 0) {
+        if ($totalAntrean > 0) {
             Notification::make()
-                ->title('Berhasil!')
-                ->body("Sebanyak {$suksesKirim} pesan WhatsApp berhasil disiarkan ke target.")
+                ->title('Berhasil Masuk Antrean!')
+                ->body("Sebanyak {$totalAntrean} pesan WhatsApp dijadwalkan dalam sistem antrean background job.")
                 ->success()
                 ->send();
 
             $this->form->fill();
-        } else {
-            Notification::make()
-                ->title('Pengiriman Gagal')
-                ->body('Pesan gagal dikirim. Periksa kuota token Fonnte atau koneksi internet Anda.')
-                ->danger()
-                ->send();
         }
     }
 }

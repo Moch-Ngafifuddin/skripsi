@@ -10,7 +10,7 @@ class LayananFonnte
     public static function kirimPesan($target, $pesan)
     {
         // Standar Internasional: Selalu isolasi kredensial API di config/env, jangan hardcode
-        $token = config('services.fonnte.token') ?? env('FONNTE_TOKEN');
+        $token = config('services.fonnte.token');
 
         if (!$token) {
             Log::error('[SECURITY WARNING] Fonnte Token belum diatur di file konfigurasi.');
