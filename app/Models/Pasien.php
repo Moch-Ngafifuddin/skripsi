@@ -8,12 +8,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Pasien extends Model
 {
     protected $table = 'pasien';
+
+    protected $fillable = [
+        'is_arsip',
+        'keterangan_pindah',
+        'tgl_meninggal',
+        'tempat_pemakaman',
+        'penyebab_meninggal',
+    ];
     protected $casts = [
         'nik' => 'encrypted',
         'no_kk' => 'encrypted',
         'no_hp' => 'encrypted',
         'nik_ibu' => 'encrypted',
         'nik_ayah' => 'encrypted',
+        
     ];
     protected $guarded = [];
 

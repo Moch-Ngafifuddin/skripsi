@@ -39,7 +39,13 @@ class AdminPanelProvider extends PanelProvider
             ->path('')
             ->login(CustomLogin::class)
             ->colors([
-                'primary' => $warnaHex,
+                //'primary' => $warnaHex,
+                'primary' => Color::Emerald,
+                'success' => Color::Teal,
+                'warning' => Color::Amber,
+                'danger'  => Color::Rose,
+                'info'    => Color::Sky,
+                'gray'    => Color::Slate,
             ])
             ->brandName($namaPuskesmas)
             ->brandLogo($logoUrl)
