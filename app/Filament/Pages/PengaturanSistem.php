@@ -43,6 +43,10 @@ class PengaturanSistem extends Page
                             ->label('Nama Puskesmas / Aplikasi')
                             ->required(),
 
+                        TextInput::make('text_logo')
+                            ->label('Input No / Kalimat di sebelah logo')
+                            ->required(),
+
                         Textarea::make('teks_login')
                             ->label('Teks Selamat Datang di Halaman Login')
                             ->rows(3)
@@ -54,7 +58,6 @@ class PengaturanSistem extends Page
                             ->image()
                             ->directory('branding-logo'),
 
-
                         Select::make('tinggi_logo_utama')
                             ->label('Ukuran Tinggi Logo Utama di Sidebar')
                             ->options([
@@ -65,7 +68,6 @@ class PengaturanSistem extends Page
                             ])
                             ->default('2.5rem')
                             ->required(),
-
 
                         Select::make('posisi_form_login')
                             ->label('Tata Letak Kotak Form Login')
@@ -91,7 +93,7 @@ class PengaturanSistem extends Page
                     ]),
 
                 Section::make('Pengaturan Multi Logo Halaman Login')
-                    ->description('Tambahkan satu atau several logo instansi pendukung yang akan ditampilkan di atas judul login.')
+                    ->description('Tambahkan satu atau beberapa logo instansi pendukung yang akan ditampilkan di atas judul login.')
                     ->schema([
                         Repeater::make('logos')
                             ->label('Daftar Logo Instansi Tambahan')
@@ -126,17 +128,12 @@ class PengaturanSistem extends Page
     public function simpan(): void
     {
         $formData = $this->form->getState();
-        
-        $pengaturan = Pengaturan::find(1);
-        $pengaturan->update($formData);
-
-        $this->form->fill($pengaturan->fresh()->toArray());
-
+        Pengaturan::updateOrCreate(['id' => 1], $formData);
         Notification::make()
-            ->title('Logo Tersimpan')
-            ->body('Perubahan berhasil diterapkan ke sistem.')
+            ->title('Konfigurasi Berhasil Disimpan')
+            ->body('Perubahan branding dan tampilan sukses diterapkan ke sistem.')
             ->success()
-            ->duration(2000) 
+            ->duration(3000) 
             ->send();
     }
 }

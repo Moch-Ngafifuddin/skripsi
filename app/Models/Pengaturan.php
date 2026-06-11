@@ -17,6 +17,7 @@ class Pengaturan extends Model
         'background_login',
         'tinggi_logo_utama',
         'posisi_form_login',
+        'text_logo'
     ];
     
     protected $casts = [

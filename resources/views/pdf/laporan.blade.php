@@ -10,6 +10,12 @@
         th, td { border: 1px solid #000; padding: 6px; text-align: center; }
         th { background-color: #f3f4f6; font-weight: bold; }
         .grafik-container { text-align: center; margin-top: 25px; page-break-inside: avoid; }
+        
+        /* Tambahan style ringkasan kategori status */
+        .box-kategori { margin-bottom: 20px; border: 1px solid #cbd5e1; padding: 12px; background-color: #f8fafc; border-radius: 6px; }
+        .box-kategori h4 { margin: 0 0 8px 0; color: #1e3a8a; font-size: 12px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
+        .table-kategori { width: 100%; margin-bottom: 0; }
+        .table-kategori td { border: none; text-align: left; padding: 3px 0; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -19,6 +25,35 @@
             <strong>Nama Balita:</strong> {{ $pasien->nama }} ({{ $pasien->jenis_kelamin }})
         </p>
     </div>
+
+    @if($pemeriksaan->count() > 0)
+        @php
+            $pemeriksaanTerbaru = $pemeriksaan->last();
+        @endphp
+        <div class="box-kategori">
+            <h4>Kesimpulan Kategori Status Tumbuh Kembang Terakhir</h4>
+            <table class="table-kategori">
+                <tr>
+                    <td style="width: 25%; font-weight: bold;">Kategori Gizi (BB/U)</td>
+                    <td style="width: 2%;">:</td>
+                    <td style="color: #1e3a8a; font-weight: bold;">{{ $pemeriksaanTerbaru->status_gizi ?? '-' }}</td>
+                    
+                    <td style="width: 25%; font-weight: bold;">Tanggal Periksa Terakhir</td>
+                    <td style="width: 2%;">:</td>
+                    <td>{{ \Carbon\Carbon::parse($pemeriksaanTerbaru->tgl_periksa)->translatedFormat('d-m-Y') }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Kategori Stunting (TB/U)</td>
+                    <td>:</td>
+                    <td style="color: #10b981; font-weight: bold;">{{ $pemeriksaanTerbaru->status_stunting ?? '-' }}</td>
+                    
+                    <td style="font-weight: bold;">Usia Saat Periksa</td>
+                    <td>:</td>
+                    <td>{{ $pemeriksaanTerbaru->usia_bulan }} Bulan</td>
+                </tr>
+            </table>
+        </div>
+    @endif
 
     <h3>Riwayat Lengkap Pemeriksaan</h3>
     <table>
@@ -56,27 +91,26 @@
 
         $totalData = $pemeriksaan->count();
 
-        // Daftar blueprint grafik yang ingin dicetak ke PDF
         $daftarGrafik = [
             [
                 'judul' => '1. Grafik Perkembangan Berat Badan menurut Umur (BB/U)',
                 'kolom_y' => 'berat_badan',
                 'satuan' => 'kg',
-                'warna_garis' => '#3b82f6', // Biru
+                'warna_garis' => '#3b82f6',
                 'warna_titik' => '#1d4ed8'
             ],
             [
                 'judul' => '2. Grafik Perkembangan Tinggi Badan menurut Umur (TB/U)',
                 'kolom_y' => 'tinggi_badan',
                 'satuan' => 'cm',
-                'warna_garis' => '#10b981', // Hijau
+                'warna_garis' => '#10b981',
                 'warna_titik' => '#047857'
             ],
             [
                 'judul' => '3. Grafik Tren Nilai Antropometri Z-Score (BB/U)',
                 'kolom_y' => 'zscore_bbu',
                 'satuan' => 'SD',
-                'warna_garis' => '#f59e0b', // Jingga
+                'warna_garis' => '#f59e0b',
                 'warna_titik' => '#b45309'
             ]
         ];
@@ -88,12 +122,10 @@
                 <h3 style="font-size: 12px; margin-bottom: 10px; color: #1e3a8a;">{{ $grafik['judul'] }}</h3>
 
                 @php
-                    // Ambil rentang nilai Y secara dinamis sesuai kolom data
                     $nilaiY = $pemeriksaan->pluck($grafik['kolom_y'])->map(fn($v) => (float)$v);
                     $maxVal = $nilaiY->max() > 0 ? $nilaiY->max() : 10;
                     $minVal = $nilaiY->min() < 0 ? $nilaiY->min() : 0;
                     
-                    // Skala batas atas & bawah grafik agar tidak mentok bingkai
                     $yMax = $grafik['kolom_y'] == 'zscore_bbu' ? ceil($maxVal + 1) : ceil($maxVal + 2);
                     $yMin = $grafik['kolom_y'] == 'zscore_bbu' ? floor($minVal - 1) : 0;
                     $yValueRange = ($yMax - $yMin) > 0 ? ($yMax - $yMin) : 1;

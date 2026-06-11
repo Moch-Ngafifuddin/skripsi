@@ -5,16 +5,11 @@ namespace App\Exports;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class DatabaseBalitaExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class DatabaseBalitaExport implements FromCollection, WithHeadings, WithMapping
 {
     protected $records;
-    protected $rowNumber = 0;
 
-    // Menerima data terfilter dari Filament agar bebas N+1 Query
     public function __construct($records)
     {
         $this->records = $records;
@@ -25,7 +20,6 @@ class DatabaseBalitaExport implements FromCollection, WithHeadings, WithMapping,
         return $this->records;
     }
 
-    // 1. MEMBUAT HEADINGS (JUDUL KOLOM) YANG RAPI
     public function headings(): array
     {
         return [
@@ -35,41 +29,47 @@ class DatabaseBalitaExport implements FromCollection, WithHeadings, WithMapping,
             'JK',
             'Tanggal Lahir',
             'Nama Ortu (Ibu)',
+            'Kategori Gizi (BB/U)', 
+            'Kategori Stunting (TB/U)', 
             'Provinsi',
             'Kab/Kota',
             'Kecamatan',
             'Puskesmas',
             'Desa/Kel',
-            'Posyandu'
+            'Posyandu',
         ];
     }
 
-    // 2. MEMETAKAN DATA SESUAI SUSUNAN KOLOM
     public function map($row): array
     {
-        $this->rowNumber++;
+        static $no = 1;
+
+        $tanggalLahir = $row->pasien?->tgl_lahir 
+            ? \Carbon\Carbon::parse($row->pasien->tgl_lahir)->format('d-m-Y') 
+            : '-';
 
         return [
-            $this->rowNumber,
-            $row->pasien?->nik ? "'" . $row->pasien->nik : '-', // Trik tanda kutip (') agar NIK tidak rusak di Excel
+            $no++,
+            "'" . ($row->pasien?->nik ?? '-'), 
             $row->pasien?->nama ?? '-',
             $row->pasien?->jenis_kelamin ?? '-',
-            $row->pasien?->tgl_lahir ? \Carbon\Carbon::parse($row->pasien->tgl_lahir)->format('d-m-Y') : '-',
+            $tanggalLahir,
             $row->pasien?->nama_ibu ?? '-',
-            auth()->user()?->provinsi ?? '-',
-            auth()->user()?->kabupaten_kota ?? '-',
-            auth()->user()?->kecamatan ?? '-',
-            auth()->user()?->nama_puskesmas ?? '-',
-            auth()->user()?->desa_kelurahan ?? '-',
-            auth()->user()?->nama_posyandu ?? '-',
+            $row->status_gizi ?? '-', 
+            $row->status_stunting ?? '-',
+            $row->pasien?->provinsi ?? 'Jawa Tengah',
+            $row->pasien?->kabupaten ?? $row->pasien?->kab_kota ?? 'Tegal',
+            $row->pasien?->kecamatan ?? 'Slawi',
+            'Tambak Sari Kidul', 
+            $row->pasien?->desa_kelurahan ?? '-', 
+            
+            $row->pasien?->nama_posyandu ?? $row->pasien?->posyandu ?? 'Posyandu Utama',
         ];
     }
 
-    // 3. MEMBERI STYLE (Menebalkan Header Otomatis)
     public function styles(Worksheet $sheet)
     {
         return [
-            // Baris nomor 1 (Header) akan otomatis Bold/Tebal
             1 => ['font' => ['bold' => true]],
         ];
     }

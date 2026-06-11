@@ -35,66 +35,52 @@ class JadwalPosyanduResource extends Resource
                             ->columnSpan('full'), 
 
                         Forms\Components\Select::make('kategori_target')
-                            ->label('Kelompok Target Sasaran')
+                            ->label('Kelompok Target')
                             ->options([
-                                'balita' => 'Balita',
+                                'balita' => 'Balita (Orang Tua)',
                                 'remaja' => 'Remaja',
-                                'lansia' => 'Lansia',
+                                'lansia' => 'Lansia / Keluarga',
                                 'bumil' => 'Ibu Hamil',
                             ])
-                            ->required(),
-
-                        Forms\Components\DatePicker::make('tanggal_acara')
-                            ->label('Tanggal Pelaksanaan')
                             ->required()
-                            ->native(false),
+                            ->live(),
 
-                        Forms\Components\TimePicker::make('waktu_acara')
-                            ->label('Waktu / Jam Pelaksanaan')
+                        Forms\Components\DatePicker::make('tanggal_pelaksanaan')
+                            ->label('Tanggal Kegiatan')
                             ->required()
-                            ->default('08:00'),
-
-                        Forms\Components\TextInput::make('tempat_acara')
-                            ->label('Tempat / Lokasi Acara')
-                            ->required()
-                            ->placeholder('Contoh: Balai Desa Pasirmuncang'),
+                            ->minDate(now()->toDateString()),
 
                         Forms\Components\TimePicker::make('jam_kirim_pesan')
                             ->label('Jam Pengiriman Pesan (H-1)')
-                            ->default('08:00')
-                            ->required(),
-
-                        Forms\Components\Select::make('template_id')
-                            ->label('Gunakan Master Template Pesan (Opsional)')
-                            ->relationship('templatePesan', 'nama_template')
-                            ->placeholder('-- Pilih Template Master (Atau Ketik Manual Di Bawah) --')
-                            ->searchable()
-                            ->preload()
-                            ->live() 
-                            ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
-                                if ($state) {
-                                    $template = TemplatePesan::find($state);
-                                    if ($template) {
-                                        $set('isi_pesan', $template->isi_pesan);
-                                    }
-                                }
-                            })
-                            ->columnSpan('full'),
-
-                        Forms\Components\Textarea::make('isi_pesan')
-                            ->label('Konten Pesan Pengingat WhatsApp')
-                            ->helperText('Gunakan {nama_ibu}, {nama_balita}, {tanggal}, {waktu}, dan {tempat} untuk memanggil data secara dinamis.')
-                            ->rows(5)
                             ->required()
-                            ->columnSpan('full')
-                            ->placeholder("Assalamualaikum wr.wb Bapak/Ibu {nama_ibu},\nMeningatkan bahwa besok pada:\nTanggal: {tanggal}\nWaktu: {waktu}\nTempat: {tempat}\n\nAkan diadakan {judul_agenda}. Mohon kehadirannya."),
+                            ->default('08:00'),
 
+                        Forms\Components\Select::make('template_pesan_id')
+                            ->label('Gunakan Template Pesan Master')
+                            ->helperText('Pilih template yang sudah dibuat atau pilih kustom untuk mengetik manual.')
+                            ->options(TemplatePesan::all()->pluck('nama_template', 'id'))
+                            ->searchable()
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                if ($state) {
+                                        $template = TemplatePesan::find($state);
+                                        if ($template) {
+                                            $set('isi_pesan_kustom', $template->isi_template);
+                                        }
+                                }
+                            }),
+
+                        Forms\Components\Textarea::make('isi_pesan_kustom')
+                            ->label('Isi Pesan Siaran (WhatsApp Content)')
+                            ->rows(6)
+                            ->required()
+                            ->placeholder('Tulis isi pesan pengingat di sini...')
+                            ->columnSpan('full')
+                            ->helperText(new HtmlString('Gunakan variabel dinamis berikut:<br><b>{nama}</b> = Nama Target, <b>{agenda}</b> = Nama Kegiatan, <b>{tanggal}</b> = Tanggal Kegiatan.')),
+                            
                         Forms\Components\Toggle::make('is_aktif')
-                            ->label('Status Pengingat Otomatis')
-                            ->helperText('Jika dinonaktifkan, pesan H-1 tidak akan dikirim oleh server.')
+                            ->label('Aktifkan Jadwal Pengingat Ini')
                             ->default(true)
-                            ->onColor('success')
-                            ->offColor('danger')
                             ->columnSpan('full'),
                     ])->columns(2)
             ]);
@@ -103,30 +89,43 @@ class JadwalPosyanduResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // 🟢 PERBAIKAN UTAMA: OPTIMASI EAGER LOADING UNTUK MENCEGAH TIMEOUT N+1 LOOP
+            ->modifyQueryUsing(fn ($query) => $query->with(['templatePesan'])) 
+            
             ->columns([
-                Tables\Columns\TextColumn::make('tanggal_acara')
-                    ->label('Tanggal Acara')
-                    ->date('d M Y')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('index')
+                    ->label('No')
+                    ->rowIndex()
+                    ->alignCenter(),
 
                 Tables\Columns\TextColumn::make('judul_agenda')
-                    ->label('Agenda Kegiatan')
-                    ->searchable(),
+                    ->label('Nama Kegiatan')
+                    ->searchable()
+                    ->wrap()
+                    ->weight('semibold'),
 
+                Tables\Columns\TextColumn::make('tanggal_pelaksanaan')
+                    ->label('Tanggal Acara')
+                    ->date('d-m-Y')
+                    ->sortable(),
+
+                // 🟢 PERBAIKAN 2: Pemanggilan Relasi Berbadge yang Sudah Ter-Optimasi Eager Loading
                 Tables\Columns\TextColumn::make('templatePesan.nama_template')
                     ->label('Template Master')
                     ->default('Kustom (Ketik Manual)')
                     ->badge()
                     ->color(fn ($state) => $state === 'Kustom (Ketik Manual)' ? 'warning' : 'success'),
 
-                Tables\Columns\BadgeColumn::make('kategori_target')
+                Tables\Columns\TextColumn::make('kategori_target')
                     ->label('Target')
-                    ->colors([
-                        'primary' => 'balita',
-                        'warning' => 'remaja',
-                        'success' => 'lansia',
-                        'danger' => 'bumil',
-                    ]),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'balita' => 'primary',
+                        'remaja' => 'warning',
+                        'lansia' => 'success',
+                        'bumil' => 'danger',
+                        default => 'secondary',
+                    }),
 
                 Tables\Columns\TextColumn::make('jam_kirim_pesan')
                     ->label('Jam Kirim (H-1)'),
