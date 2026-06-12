@@ -16,11 +16,37 @@ class LaporanPdfController extends Controller
     /**
      * Fitur Cetak/Unduh PDF Rekam Medis Massal / Riwayat Pasien Tunggal
      */
+    // public function downloadLaporan($id)
+    // {
+    //     // 🟢 PERBAIKAN: Mengaktifkan kembali inisialisasi model Pasien
+    //     $pasien = Pasien::findOrFail($id);
+
+    //     $semuaRiwayat = PemeriksaanBayi::where('pasien_id', $pasien->id)
+    //         ->orderBy('tgl_periksa', 'asc')
+    //         ->get();
+
+    //     $pdf = Pdf::loadView('pdf.laporan', [
+    //         'pasien' => $pasien,
+    //         'pemeriksaan' => $semuaRiwayat
+    //     ]);
+
+    //     $pdf->setOption([
+    //         'isHtml5ParserEnabled' => true,
+    //         'isRemoteEnabled' => true
+    //     ]);
+
+    //     return $pdf->download('Laporan_Lengkap_' . $pasien->nama . '.pdf');
+    // }
+
     public function downloadLaporan($id)
     {
-        // 🟢 PERBAIKAN: Mengaktifkan kembali inisialisasi model Pasien
-        $pasien = Pasien::findOrFail($id);
+        // 1. Cari data berdasarkan ID Pemeriksaan yang dikirim oleh link WA
+        $pemeriksaanUtama = PemeriksaanBayi::with('pasien')->findOrFail($id);
+        
+        // 2. Ambil objek pasien dari baris pemeriksaan tersebut
+        $pasien = $pemeriksaanUtama->pasien;
 
+        // 3. Ambil semua riwayat perkembangan anak ini dari awal hingga akhir untuk dicetak di grafik
         $semuaRiwayat = PemeriksaanBayi::where('pasien_id', $pasien->id)
             ->orderBy('tgl_periksa', 'asc')
             ->get();
@@ -37,7 +63,6 @@ class LaporanPdfController extends Controller
 
         return $pdf->download('Laporan_Lengkap_' . $pasien->nama . '.pdf');
     }
-
     /**
      * Fitur Kirim Tautan Laporan PDF Hasil Pemeriksaan Bulanan via WhatsApp Gateway (Fonnte)
      */

@@ -7,12 +7,13 @@ use App\Models\JadwalPosyandu;
 use App\Models\TemplatePesan;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Forms\Get; 
 use Filament\Forms\Set; 
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\HtmlString;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TimePicker;
 
 class JadwalPosyanduResource extends Resource
 {
@@ -33,6 +34,12 @@ class JadwalPosyanduResource extends Resource
                             ->required()
                             ->placeholder('Contoh: Pelaksanaan Posyandu & Imunisasi Balita rutin')
                             ->columnSpan('full'), 
+                        
+                        Forms\Components\TextInput::make('tempat_acara')
+                            ->label('Lokasi Tempat Pelaksanaan')
+                            ->required()
+                            ->placeholder('Contoh: Puskesmas Kembaran')
+                            ->columnSpan('full'), 
 
                         Forms\Components\Select::make('kategori_target')
                             ->label('Kelompok Target')
@@ -45,39 +52,52 @@ class JadwalPosyanduResource extends Resource
                             ->required()
                             ->live(),
 
-                        Forms\Components\DatePicker::make('tanggal_pelaksanaan')
+                        Forms\Components\DatePicker::make('tanggal_acara')
                             ->label('Tanggal Kegiatan')
                             ->required()
                             ->minDate(now()->toDateString()),
 
-                        Forms\Components\TimePicker::make('jam_kirim_pesan')
+                        TimePicker::make('jam_kirim_pesan')
                             ->label('Jam Pengiriman Pesan (H-1)')
                             ->required()
-                            ->default('08:00'),
+                            ->default('17:00')
+                            ->format('H:i')
+                            ->displayFormat('H:i')
+                            ->seconds(false),
 
-                        Forms\Components\Select::make('template_pesan_id')
+                        TimePicker::make('waktu_acara')
+                            ->label('Waktu Pelaksanaan')
+                            ->required()
+                            ->default('08:00')
+                            ->format('H:i') 
+                            ->displayFormat('H:i')
+                            ->seconds(false),
+
+                        // 🟢 FIX QC N+1 & SINKRONISASI KOLOM: Menggunakan 'template_id' sesuai isi Model fillable
+                        Select::make('template_id')
                             ->label('Gunakan Template Pesan Master')
-                            ->helperText('Pilih template yang sudah dibuat atau pilih kustom untuk mengetik manual.')
-                            ->options(TemplatePesan::all()->pluck('nama_template', 'id'))
+                            ->relationship('templatePesan', 'nama_template') // Menggunakan jalur relasi resmi Filament (Anti N+1)
+                            ->placeholder('Kustom (Ketik Manual)')
                             ->searchable()
-                            ->reactive()
-                            ->afterStateUpdated(function ($state, Set $set) {
+                            ->preload() // Memuat data secara efisien di latar belakang
+                            ->live() 
+                            ->afterStateUpdated(function (?string $state, Set $set) {
                                 if ($state) {
-                                        $template = TemplatePesan::find($state);
-                                        if ($template) {
-                                            $set('isi_pesan_kustom', $template->isi_template);
-                                        }
+                                    $template = TemplatePesan::find($state);
+                                    if ($template) {
+                                        $set('isi_pesan', $template->isi_pesan); 
+                                    }
+                                } else {
+                                    $set('isi_pesan', null);
                                 }
                             }),
 
-                        Forms\Components\Textarea::make('isi_pesan_kustom')
+                        Textarea::make('isi_pesan') 
                             ->label('Isi Pesan Siaran (WhatsApp Content)')
-                            ->rows(6)
-                            ->required()
                             ->placeholder('Tulis isi pesan pengingat di sini...')
-                            ->columnSpan('full')
-                            ->helperText(new HtmlString('Gunakan variabel dinamis berikut:<br><b>{nama}</b> = Nama Target, <b>{agenda}</b> = Nama Kegiatan, <b>{tanggal}</b> = Tanggal Kegiatan.')),
-                            
+                            ->rows(5)
+                            ->required(),
+
                         Forms\Components\Toggle::make('is_aktif')
                             ->label('Aktifkan Jadwal Pengingat Ini')
                             ->default(true)
@@ -89,7 +109,7 @@ class JadwalPosyanduResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            // 🟢 PERBAIKAN UTAMA: OPTIMASI EAGER LOADING UNTUK MENCEGAH TIMEOUT N+1 LOOP
+            // 🟢 FIX QC N+1 LIST VIEW: Mengunci Eager Loading ke fungsi relasi CamelCase murni
             ->modifyQueryUsing(fn ($query) => $query->with(['templatePesan'])) 
             
             ->columns([
@@ -104,22 +124,22 @@ class JadwalPosyanduResource extends Resource
                     ->wrap()
                     ->weight('semibold'),
 
-                Tables\Columns\TextColumn::make('tanggal_pelaksanaan')
+                Tables\Columns\TextColumn::make('tanggal_acara')
                     ->label('Tanggal Acara')
                     ->date('d-m-Y')
                     ->sortable(),
 
-                // 🟢 PERBAIKAN 2: Pemanggilan Relasi Berbadge yang Sudah Ter-Optimasi Eager Loading
+                // 🟢 FIX QC DISPLAY: Memanggil struktur camelCase yang sudah ter-eager-load
                 Tables\Columns\TextColumn::make('templatePesan.nama_template')
                     ->label('Template Master')
                     ->default('Kustom (Ketik Manual)')
                     ->badge()
                     ->color(fn ($state) => $state === 'Kustom (Ketik Manual)' ? 'warning' : 'success'),
 
-                Tables\Columns\TextColumn::make('kategori_target')
+                    Tables\Columns\TextColumn::make('kategori_target')
                     ->label('Target')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn ($state) => match ($state) {
                         'balita' => 'primary',
                         'remaja' => 'warning',
                         'lansia' => 'success',
@@ -128,7 +148,8 @@ class JadwalPosyanduResource extends Resource
                     }),
 
                 Tables\Columns\TextColumn::make('jam_kirim_pesan')
-                    ->label('Jam Kirim (H-1)'),
+                    ->label('Jam Kirim (H-1)')
+                    ->time('H:i'), 
 
                 Tables\Columns\ToggleColumn::make('is_aktif')
                     ->label('Sakelar Otomatis'),
@@ -141,6 +162,24 @@ class JadwalPosyanduResource extends Resource
                         'lansia' => 'Lansia',
                         'bumil' => 'Ibu Hamil',
                     ])
+            ])
+
+            // 🟢 TOMBOL AKSI BARIS (Hapus Satuan yang Benar)
+            ->actions([
+                Tables\Actions\EditAction::make(), // Tombol Edit bawaan Anda
+                Tables\Actions\DeleteAction::make() 
+                    ->modalHeading('Hapus Jadwal Posyandu')
+                    ->modalDescription('Apakah Anda yakin ingin menghapus jadwal agenda ini? Tindakan ini tidak dapat dibatalkan.')
+                    // 🟢 PERBAIKAN: Gunakan fungsi bawaan Filament yang tepat di bawah ini
+                    ->modalSubmitActionLabel('Ya, Hapus Data'), 
+            ])
+            // TOMBOL AKSI MASSAL (Hapus Banyak Data Sekaligus)
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->modalHeading('Hapus Banyak Jadwal Posyandu')
+                        ->modalDescription('Apakah Anda yakin ingin menghapus semua jadwal posyandu yang dipilih?'),
+                ]),
             ]);
     }
     

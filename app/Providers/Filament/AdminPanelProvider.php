@@ -20,17 +20,32 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Models\Pengaturan;
 use App\Filament\Pages\Auth\CustomLogin;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Facades\Schema;
 
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        $pengaturan = Pengaturan::first();
-        $logoUrl = $pengaturan?->logo ? asset('storage/' . $pengaturan->logo) : asset('logo_kecil.svg');
-        $namaPuskesmas = $pengaturan?->nama_puskesmas ?? 'Sistem Informasi Posyandu';
-        $warnaHex = $pengaturan?->warna_tema ?? '#10b981';
-        $textLogo = $pengaturan?->text_logo ?? '';
-        $tinggiLogoUtama = $pengaturan?->tinggi_logo_utama ?? '2.5rem'; 
+        // 🟢 LANGKAH AMAN: Inisialisasi nilai default agar tidak crash saat migrasi awal
+        $logoUrl = asset('logo_kecil.svg');
+        $namaPuskesmas = 'Sistem Informasi Posyandu';
+        $textLogo = '';
+        $tinggiLogoUtama = '2.5rem';
+
+        // Pengecekan database yang aman dari resiko infinite loop
+        try {
+            if (Schema::hasTable('pengaturan')) {
+                $pengaturan = Pengaturan::first();
+                if ($pengaturan) {
+                    $logoUrl = $pengaturan->logo ? asset('storage/' . $pengaturan->logo) : asset('logo_kecil.svg');
+                    $namaPuskesmas = $pengaturan->nama_puskesmas ?? 'Sistem Informasi Posyandu';
+                    $textLogo = $pengaturan->text_logo ?? '';
+                    $tinggiLogoUtama = $pengaturan->tinggi_logo_utama ?? '2.5rem';
+                }
+            }
+        } catch (\Throwable $e) {
+            // Abaikan eror jika database belum siap
+        }
 
         return $panel
             ->default()
@@ -47,10 +62,10 @@ class AdminPanelProvider extends PanelProvider
                 'gray'    => Color::Slate,
             ])
             
-            // 🟢 PERBAIKAN 1: Mengunci Nama Brand Utama sesuai Nama Puskesmas
+            // Mengunci nama brand utama
             ->brandName($namaPuskesmas) 
 
-            // 🟢 PERBAIKAN 2: Render Teks Murni dari input text_logo di samping gambar logo asli
+            // Render logo dan teks kustom di samping gambar logo
             ->brandLogo(new \Illuminate\Support\HtmlString("
                 <div class='flex items-center gap-3 py-1'>
                     <img src='{$logoUrl}' alt='Logo' style='height: {$tinggiLogoUtama}; width: auto; object-fit: contain;' />
@@ -63,26 +78,11 @@ class AdminPanelProvider extends PanelProvider
             "))
             ->brandLogoHeight($tinggiLogoUtama)
             
-            // 🟢 PERBAIKAN UTAMA 3: Mengunci Judul Tab Browser menggunakan HTML Head Render Hook
-            // Cara ini memaksa browser mengabaikan text 'Dashboard' atau 'Pasien' dan menguncinya ke Nama Puskesmas
+            // 🟢 SOLUSI AMAN JUDUL TAB: Gunakan renderHook hanya untuk menyuntikkan judul awal secara statis
+            // TANPA JavaScript MutationObserver yang memicu loop tabrakan dengan Livewire
             ->renderHook(
                 'panels::head.end',
-                fn () => new \Illuminate\Support\HtmlString("
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            // Mengunci judul tab pertama kali dimuat
-                            document.title = '" . e($namaPuskesmas) . "';
-                            
-                            // Mencegah Livewire mengubah judul kembali saat berpindah halaman menu
-                            const observer = new MutationObserver(function(mutations) {
-                                if (document.title !== '" . e($namaPuskesmas) . "') {
-                                    document.title = '" . e($namaPuskesmas) . "';
-                                }
-                            });
-                            observer.observe(document.querySelector('title'), { subtree: true, characterData: true, childList: true });
-                        });
-                    </script>
-                ")
+                fn () => new \Illuminate\Support\HtmlString("<title>" . e($namaPuskesmas) . "</title>")
             )
             
             ->databaseNotifications()

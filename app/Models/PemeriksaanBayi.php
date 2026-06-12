@@ -9,7 +9,7 @@ class PemeriksaanBayi extends Model
 {
     use HasFactory;
     protected $table = 'pemeriksaan_bayi';
-   // protected $guarded = [];
+    protected $casts = ['jenis_imunisasi' => 'array'];
     protected $fillable = [
         'pasien_id',
         'tgl_periksa',

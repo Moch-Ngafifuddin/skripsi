@@ -12,8 +12,10 @@ use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use App\Models\Pasien;
 use App\Models\TemplatePesan;
-use App\Jobs\ProsesKirimWa; // Mengintegrasikan file Job Antrean
+use App\Jobs\ProsesKirimWa;
 use Carbon\Carbon;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 
 class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
 {
@@ -50,19 +52,23 @@ class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
                             ])
                             ->required(),
 
-                        Select::make('pilihan_template')
-                            ->label('Pilih Template Pesan')
-                            ->options(function () {
-                                return TemplatePesan::pluck('nama_template', 'id')->toArray();
-                            })
-                            ->placeholder('Pilih template dari database...')
-                            ->live()
-                            ->afterStateUpdated(function ($state, callable $set) {
+                        // 1. Pilih Template Menggunakan Select Component yang Reaktif
+                        Select::make('template_pesan_id')
+                            ->label('Gunakan Template Master')
+                            ->options(TemplatePesan::all()->pluck('nama_template', 'id')) // Ambil data dari tabel SQL
+                            ->placeholder('Kustom (Ketik Manual)')
+                            ->live() // 🟢 Membuat komponen ini reaktif secara real-time
+                            ->afterStateUpdated(function (?string $state, Set $set) {
+                                // 🟢 Jalankan pencarian otomatis ketika template dipilih
                                 if ($state) {
                                     $template = TemplatePesan::find($state);
                                     if ($template) {
-                                        $set('isi_pesan', $template->isi_pesan);
+                                        // Tembakkan isi_pesan dari database ke input teks bernama 'isi_pesan'
+                                        $set('isi_pesan', $template->isi_pesan); 
                                     }
+                                } else {
+                                    // Jika dikosongkan (pilih kustom), kosongkan kotak input pesan
+                                    $set('isi_pesan', null);
                                 }
                             }),
 
@@ -76,12 +82,15 @@ class KirimWaMassal extends Page implements \Filament\Forms\Contracts\HasForms
                             ->placeholder('Contoh: Gedung Olahraga Bancarkembar')
                             ->required(),
 
+                        // 2. 🟢 SATU INPUTAN PESAN UTAMA: Terintegrasi dengan Template & Variabel Dinamis
                         Textarea::make('isi_pesan')
-                            ->label('Struktur Isi Pesan')
-                            ->helperText('Jangan hapus kode {tanggal} dan {lokasi} karena akan otomatis diganti oleh sistem.')
+                            ->label('Struktur Isi Pesan Siaran WhatsApp')
+                            ->placeholder('Ketik pesan di sini atau pilih dari template master di atas...')
+                            ->helperText('Anda bisa menggunakan kode placeholder otomatis: {nama}, {tanggal}, dan {lokasi} untuk mempermudah isi pesan.')
                             ->rows(8)
-                            ->required(),
-                    ])->columns(2),
+                            ->required()
+                            ->columnSpan('full'), // Membuat kotak pesan melebar penuh agar rapi
+                    ])->columns(2), // 🟢 Penutup Section yang benar sekarang ada di sini
             ])
             ->statePath('data');
     }

@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Filament\Forms\Components\Toggle;
 
 class PemeriksaanBayiResource extends Resource
 {
@@ -196,13 +200,62 @@ class PemeriksaanBayiResource extends Resource
                 // --- MEJA 4: BERAT BADAN ---
                 Forms\Components\Section::make('Data Penimbangan (Meja 4)')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_4', 'meja_5', 'superadmin']))
-                    ->schema([
-                        Forms\Components\TextInput::make('berat_badan')
-                            ->label('Berat Badan (Kg)')
-                            ->numeric()
-                            ->live(onBlur: true)
-                            ->afterStateUpdated($kalkulasiStatusGizi),
-                    ]),
+                    // ->schema([
+                    //     Forms\Components\TextInput::make('berat_badan')
+                    //         ->label('Berat Badan (Kg)')
+                    //         ->numeric()
+                    //         ->live(onBlur: true)
+                    //         ->afterStateUpdated($kalkulasiStatusGizi),
+                    // ]),
+                    ->schema(
+                        TextInput::make('berat_badan')
+                        ->label('Berat Badan (Kg)')
+                        ->numeric()
+                        ->required()
+                        ->live(onBlur: true) // 🟢 Memicu perhitungan otomatis begitu kader selesai mengetik angka
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set) {
+                            $pasienId = $get('pasien_id'); // Mengambil ID bayi yang sedang diperiksa
+                            $bbSekarang = (float) $state;
+
+                            if ($pasienId && $bbSekarang > 0) {
+                                // Ambil data pemeriksaan terakhir (bulan lalu) secara instan (Anti N+1)
+                                $pemeriksaanLalu = \App\Models\PemeriksaanBayi::where('pasien_id', $pasienId)
+                                    ->orderBy('tgl_periksa', 'desc')
+                                    ->first();
+
+                                if ($pemeriksaanLalu && $pemeriksaanLalu->berat_badan) {
+                                    $bbLalu = (float) $pemeriksaanLalu->berat_badan;
+                                    
+                                    // Logika Kemenkes Sederhana: Jika berat badan sekarang lebih besar dari bulan lalu, maka Naik (N)
+                                    if ($bbSekarang > $bbLalu) {
+                                        $set('kenaikan_bb', 'naik'); // Otomatis memilih opsi 'naik' (N)
+                                        $set('keterangan_bb', "Berat badan naik " . ($bbSekarang - $bbLalu) . " Kg dari bulan lalu.");
+                                    } else {
+                                        $set('kenaikan_bb', 'tidak naik'); // Otomatis memilih opsi 'tidak naik' (T)
+                                        $set('keterangan_bb', "Berat badan tidak naik / turun dari bulan lalu.");
+                                    }
+                                } else {
+                                    // Jika ini adalah penimbangan pertama kali (bayi baru terdaftar)
+                                    $set('kenaikan_bb', 'naik');
+                                    $set('keterangan_bb', "Penimbangan pertama kali (Baru terdaftar).");
+                                }
+                            }
+                        }),
+
+                    // 2. Komponen Status Kenaikan BB yang akan terisi otomatis
+                    Select::make('kenaikan_bb')
+                        ->label('Status Kenaikan Berat Badan (N/T)')
+                        ->options([
+                            'naik' => 'N (Berat Badan Naik)',
+                            'tidak naik' => 'T (Berat Badan Tidak Naik / Tetap / Turun)',
+                        ])
+                        ->required(),
+
+                    TextInput::make('keterangan_bb')
+                        ->label('Keterangan Detil Grafik KMS')
+                        ->placeholder('Akan terisi otomatis oleh sistem...')
+                        ->readOnly(),
+                    )
 
                 // --- MEJA 5: PELAYANAN & EVALUASI AKHIR ---
                 Forms\Components\Section::make('Pelayanan, Catatan & Hasil (Meja 5)')
@@ -247,7 +300,29 @@ class PemeriksaanBayiResource extends Resource
                                 Forms\Components\Toggle::make('menerima_mbg')->label('Dapat MBG?')->inline(false),
                             ]),
                             
-                        Forms\Components\TextInput::make('jenis_imunisasi')->label('Jenis Imunisasi (Jika Ada)'),
+                        
+                        Select::make('jenis_imunisasi')
+                            ->label('Jenis Imunisasi Hari Ini')
+                            ->multiple()
+                            ->searchable()
+                            ->placeholder('Pilih satu atau beberapa imunisasi...')
+                            ->options([
+                                'HB0' => 'HB0 (0 Bulan)',
+                                'BCG' => 'BCG (1 Bulan)',
+                                'Polio 1' => 'Polio 1 (1 Bulan)',
+                                'DPT-HB-Hib 1' => 'DPT-HB-Hib 1 (2 Bulan)',
+                                'Polio 2' => 'Polio 2 (2 Bulan)',
+                                'PCV 1' => 'PCV 1 (2 Bulan)',
+                                'Rotavirus 1' => 'Rotavirus 1 (2 Bulan)',
+                                'DPT-HB-Hib 2' => 'DPT-HB-Hib 2 (3 Bulan)',
+                                'Polio 3' => 'Polio 3 (3 Bulan)',
+                                'DPT-HB-Hib 3' => 'DPT-HB-Hib 3 (4 Bulan)',
+                                'Polio 4' => 'Polio 4 (4 Bulan)',
+                                'IPV 1' => 'IPV 1 (4 Bulan)',
+                                'Campak-MR 1' => 'Campak/MR 1 (9 Bulan)',
+                                'DPT-HB-Hib Lanjutan' => 'DPT-HB-Hib Lanjutan (18 Bulan)',
+                                'Campak-MR Lanjutan' => 'Campak/MR Lanjutan (18 Bulan)',
+                            ]),
                             
                         Forms\Components\Textarea::make('catatan')
                             ->label('Catatan / KIE (Konseling)')
@@ -445,6 +520,23 @@ class PemeriksaanBayiResource extends Resource
 
                         $record->update($updateData);
                     }),
+
+                   
+
+                    Toggle::make('deteksi_tbc')
+                        ->label('Indikasi / Gejala TBC Anak')
+                        ->default(false)
+                        ->inline(false)
+                        // 🟢 Menyuntikkan panduan edukasi Kemenkes langsung ke layar form kader
+                        ->helperText(new \Illuminate\Support\HtmlString("
+                            <span class='text-xs text-rose-600 font-medium block mt-1'>
+                                ⚠️ Aktifkan sakelar ini jika balita memenuhi salah satu gejala klinis berikut:<br>
+                                1. Batuk terus-menerus selama &ge; 2 minggu.<br>
+                                2. Demam &ge; 2 minggu tanpa penyebab yang jelas.<br>
+                                3. Berat badan turun atau tidak naik dalam 2 bulan berturut-turut (2T).<br>
+                                4. Anak tampak lesu, letih, dan tidak seaktif biasanya.
+                            </span>
+                        ")),
 
                 Tables\Actions\EditAction::make()
                     ->label(fn () => Auth::user()?->meja_tugas === 'meja_5' ? 'Evaluasi (Meja 5)' : 'Ubah')
