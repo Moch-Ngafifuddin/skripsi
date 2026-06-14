@@ -5,7 +5,6 @@ namespace App\Filament\Resources\PemeriksaanBayiResource\Pages;
 use App\Filament\Resources\PemeriksaanBayiResource;
 use Filament\Resources\Pages\CreateRecord;
 use App\Models\Pasien;
-use App\Helpers\AntropometriHelper;
 use Carbon\Carbon;
 
 class CreatePemeriksaanBayi extends CreateRecord
@@ -14,25 +13,26 @@ class CreatePemeriksaanBayi extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Ambil data pasien untuk tahu Jenis Kelamin dan Tanggal Lahir
         $pasien = Pasien::find($data['pasien_id']);
         
         if ($pasien) {
-            $jk = $pasien->jenis_kelamin;
-            
-            // Hitung umur bulan secara akurat berdasarkan tanggal periksa & tanggal lahir
             $tglLahir = Carbon::parse($pasien->tgl_lahir);
             $tglPeriksa = Carbon::parse($data['tgl_periksa']);
-            $umurBulan = $tglLahir->diffInMonths($tglPeriksa);
-            
-            // Masukkan umur bulan otomatis ke kolom database
-            $data['usia_bulan'] = $umurBulan;
-
-            // Eksekusi Kalkulator Otomatis Antropometri Kemenkes
-            $data['status_gizi'] = AntropometriHelper::hitungBbu($jk, $umurBulan, $data['berat_badan']);
-            $data['status_stunting'] = AntropometriHelper::hitungTbu($jk, $umurBulan, $data['tinggi_badan']);
+            $data['usia_bulan'] = $tglLahir->diffInMonths($tglPeriksa);
         }
+
+        // Amankan nilai kosong dari Zona B dan C agar database MySQL tidak menolak saat disimpan pertama kali
+        $data['berat_badan'] = $data['berat_badan'] ?? null;
+        $data['tinggi_badan'] = $data['tinggi_badan'] ?? null;
+        $data['status_gizi'] = null;
+        $data['status_stunting'] = null;
 
         return $data;
     }
-} 
+
+    // Setelah Zona A klik Simpan, otomatis lempar balik ke halaman tabel antrean utama
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+}

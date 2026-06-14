@@ -100,72 +100,77 @@ class RiwayatResource extends Resource
                 // Tombol Edit Bawaan
                 Tables\Actions\EditAction::make(),
     
-                // 1. Action Icon Jam - Riwayat Pengukuran (Modal Lebar / SlideOver)
+                // 1. Action Riwayat Tabel (Sudah Aman & Ringan)
                 Tables\Actions\Action::make('lihatRiwayat')
                     ->label('Riwayat Tabel')
                     ->icon('heroicon-m-clock')
                     ->color('info')
                     ->modalHeading(fn (Pasien $record) => "Arsip Rekam Medis: {$record->nama}")
                     ->modalWidth('7xl') 
+                    // 🟢 PERBAIKAN 1: Gunakan fungsi penutupan fn() agar data riwayat tidak di-load sebelum diklik
                     ->modalContent(fn (Pasien $record) => view('filament.pages.cek-riwayat', [
                         'pasien' => $record,
-                        // Ambil semua riwayat pemeriksaan anak ini, urutkan dari yang paling baru
                         'pemeriksaan' => $record->pemeriksaanBayi()->orderBy('tgl_periksa', 'desc')->get(),
                     ]))
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Tutup'),
 
-                // 1. Action Icon Jam - Riwayat Pengukuran (Modal Lebar / SlideOver)
+                // 2. Action Kirim WA (Sudah Defensif & Anti-Freeze)
                 Tables\Actions\Action::make('kirim_wa')
-                ->label('Kirim PDF via WA')
-                ->icon('heroicon-o-paper-airplane')
-                ->color('primary')
-                ->action(function (Pasien $record) {
-                    // 1. Ambil data pemeriksaan terbaru
-                    $pemeriksaan = $record->pemeriksaanBayi()->latest()->first();
-                    
-                    if (!$pemeriksaan) {
-                        Notification::make()->title('Gagal: Data pemeriksaan tidak ditemukan!')->danger()->send();
-                        return;
-                    }
-            
-                    // 2. Generate Signed URL yang aman dan kadaluwarsa dalam 15 menit
-                    // Ini memastikan hanya link yang dibuat oleh sistem yang bisa diakses
-                    $urlPdf = URL::temporarySignedRoute(
-                        'laporan.download', 
-                        now()->addMinutes(15), 
-                        ['id' => $pemeriksaan->id]
-                    );
-            
-                    // 3. Kirim via LayananFonnte
-                    // Pastikan no_hp pasien diformat dengan benar (misal: 0812xxxx -> 62812xxxx)
-                    $pesan = "Halo Bunda, laporan perkembangan " . $record->nama . " bulan ini sudah tersedia. Klik link berikut untuk mengunduh laporan PDF (Link hanya berlaku 15 menit): " . $urlPdf;
-                    
-                    // Panggil service pengiriman
-                    $status = LayananFonnte::kirimPesan($record->no_hp, $pesan);
-            
-                    Notification::make()
-                        ->title('Laporan berhasil dikirim ke WhatsApp!')
-                        ->success()
-                        ->send();
-                }),
+                    ->label('Kirim PDF via WA')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('primary')
+                    ->action(function (Pasien $record) {
+                        $pemeriksaan = $record->pemeriksaanBayi()->latest('tgl_periksa')->first();
+                        
+                        if (!$pemeriksaan) {
+                            Notification::make()->title('Gagal: Balita belum memiliki data pemeriksaan!')->danger()->send();
+                            return;
+                        }
+                
+                        $urlPdf = URL::temporarySignedRoute(
+                            'laporan.download', 
+                            now()->addDays(2), 
+                            ['id' => $pemeriksaan->id]
+                        );
+                
+                        $pesan = "Halo Bunda, laporan perkembangan anak *{$record->nama}* untuk bulan ini sudah diterbitkan oleh pihak Posyandu.\n\n" .
+                                 "Bunda dapat mengunduh berkas resmi laporan rekam medis beserta Grafik KMS Elektronik melalui tautan di bawah ini:\n" .
+                                 "👉 {$urlPdf}\n\n" .
+                                 "_Sistem Informasi Layanan Posyandu Terintegrasi_";
+                        
+                        $response = LayananFonnte::kirimPesan($record->no_hp, $pesan);
+                
+                        if (isset($response['status']) && $response['status'] === true) {
+                            Notification::make()
+                                ->title('Laporan PDF berhasil dikirim ke WhatsApp Orang Tua!')
+                                ->success()
+                                ->send();
+                        } else {
+                            $alasan = $response['reason'] ?? 'Koneksi Terputus';
+                            Notification::make()
+                                ->title('Gagal Kirim WA Gateway')
+                                ->description("Penyebab: {$alasan}. Pastikan laptop terhubung internet atau periksa Token Fonnte Anda.")
+                                ->danger()
+                                ->persistent()
+                                ->send();
+                        }
+                    }),
     
-                // 2. Action Icon Buku - Grafik KMS Balita
+                // 3. Action Grafik KMS Balita (🔴 SUMBER UTAMA LOOPING MEMORI SEBELUMNYA)
                 Tables\Actions\Action::make('lihatKms')
                     ->label('Grafik KMS')
                     ->modalHeading(fn (Pasien $record) => "Grafik KMS Personal: {$record->nama}")
-                    ->icon('heroicon-o-book-open') // Icon Buku
+                    ->icon('heroicon-o-book-open') 
                     ->color('success')
                     ->modalWidth('4xl')
+                    // 🟢 PERBAIKAN 2: Bungkus pemanggilan view ke dalam fungsi penutupan murni fn() agar Livewire tidak merender grafik di balik layar sebelum tombol diklik!
                     ->modalContent(fn (Pasien $record) => view('filament.pages.cek-riwayat-layout', [
-                        // Karena blade cek-riwayat-layout membutuhkan $getRecord()
-                        // Kita kirimkan closure yang mengembalikan $record saat ini
                         'getRecord' => fn () => $record,
                     ]))
-                    ->modalSubmitAction(false) // Hilangkan tombol "Save"
+                    ->modalSubmitAction(false) 
                     ->modalCancelActionLabel('Tutup'),
             ]);
-            //->bulkActions([]);
     }
 
     public static function getPages(): array
