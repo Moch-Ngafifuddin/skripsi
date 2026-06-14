@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Filament\Resources;
+
 use Filament\Forms\Components\Select;
 use Filament\Tables\Filters\Filter;
 use Carbon\Carbon;
@@ -15,7 +16,6 @@ use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
@@ -54,7 +54,7 @@ class PemeriksaanBayiResource extends Resource
             $bulan = (int) $lahir->diffInMonths($periksa);
             $tahun = (int) $lahir->diffInYears($periksa);
             
-            $set('usia_bulan', max(0, $bulan)); // 🟢 Penting untuk Z-Score
+            $set('usia_bulan', max(0, $bulan));
             
             if ($tahun >= 1) {
                 $sisaBulan = $bulan % 12;
@@ -136,10 +136,9 @@ class PemeriksaanBayiResource extends Resource
                             })
                             ->disabled(fn () => !in_array(Auth::user()?->meja_tugas, ['meja_1', 'superadmin']))
                             ->createOptionForm([
-                                // Form Ringkas untuk membuat Pasien Baru secara mendadak di meja pelayanan
                                 Forms\Components\Section::make('Identitas Umum')
                                     ->schema([
-                                        Forms\Components\TextInput::make('nik')->label('NIK')->required()->numeric()->length(16)->unique('pasiens', 'nik'),
+                                        Forms\Components\TextInput::make('nik')->label('NIK')->required()->numeric()->length(16)->unique('pasien', 'nik'),
                                         Forms\Components\TextInput::make('no_kk')->label('Nomor KK')->numeric(),
                                         Forms\Components\TextInput::make('nama')->label('Nama Lengkap')->required(),
                                         Forms\Components\Select::make('jenis_kelamin')->options(['L' => 'Laki-laki', 'P' => 'Perempuan'])->required(),
@@ -169,7 +168,7 @@ class PemeriksaanBayiResource extends Resource
                             ->dehydrated() 
                             ->required(),
                             
-                        Forms\Components\Hidden::make('usia_bulan'), // Menyimpan angka absolut bulan
+                        Forms\Components\Hidden::make('usia_bulan'), 
                     ])->columns(3),
 
                 // --- MEJA 2: TINGGI BADAN & CARA UKUR ---
@@ -197,72 +196,100 @@ class PemeriksaanBayiResource extends Resource
                         Forms\Components\TextInput::make('lila')->label('Lingkar Lengan Atas / LiLA (Cm)')->numeric(),
                     ])->columns(2),
 
-                // --- MEJA 4: BERAT BADAN ---
-                Forms\Components\Section::make('Data Penimbangan (Meja 4)')
-                    ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_4', 'meja_5', 'superadmin']))
-                    // ->schema([
-                    //     Forms\Components\TextInput::make('berat_badan')
-                    //         ->label('Berat Badan (Kg)')
-                    //         ->numeric()
-                    //         ->live(onBlur: true)
-                    //         ->afterStateUpdated($kalkulasiStatusGizi),
-                    // ]),
-                    ->schema(
-                        TextInput::make('berat_badan')
+                // --- MEJA 4: BERAT BADAN & STATUS KENAIKAN ---
+                Forms\Components\Section::make('Data Penimbangan (Meja 4) - Standar KBM Kemenkes')
+                ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_4', 'meja_5', 'superadmin']))
+                ->schema([
+                    Forms\Components\TextInput::make('berat_badan')
                         ->label('Berat Badan (Kg)')
                         ->numeric()
                         ->required()
-                        ->live(onBlur: true) // 🟢 Memicu perhitungan otomatis begitu kader selesai mengetik angka
-                        ->afterStateUpdated(function (?string $state, Get $get, Set $set) {
-                            $pasienId = $get('pasien_id'); // Mengambil ID bayi yang sedang diperiksa
+                        ->live(debounce: 500) 
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set, ?PemeriksaanBayi $record) use ($kalkulasiStatusGizi) {
+                            // 1. Jalankan kalkulasi Z-Score bawaan
+                            $kalkulasiStatusGizi($set, $get);
+
+                            $pasienId = $get('pasien_id'); 
                             $bbSekarang = (float) $state;
+                            $usiaBulan = (int) $get('usia_bulan');
 
                             if ($pasienId && $bbSekarang > 0) {
-                                // Ambil data pemeriksaan terakhir (bulan lalu) secara instan (Anti N+1)
-                                $pemeriksaanLalu = \App\Models\PemeriksaanBayi::where('pasien_id', $pasienId)
-                                    ->orderBy('tgl_periksa', 'desc')
-                                    ->first();
+                                // Ambil data pasien untuk tahu jenis kelamin (L/P)
+                                $pasien = \App\Models\Pasien::find($pasienId);
+                                $jk = $pasien ? $pasien->jenis_kelamin : 'L';
+
+                                // 🟢 LOGIKA PENENTUAN KBM KEMENKES RI
+                                $kbm = 0.2; // Nilai default terkecil untuk usia >= 12 bulan
+                                
+                                if ($usiaBulan === 1) {
+                                    $kbm = 0.8;
+                                } elseif ($usiaBulan === 2) {
+                                    $kbm = ($jk === 'L') ? 0.9 : 0.8;
+                                } elseif ($usiaBulan === 3) {
+                                    $kbm = ($jk === 'L') ? 0.8 : 0.6;
+                                } elseif ($usiaBulan === 4) {
+                                    $kbm = ($jk === 'L') ? 0.6 : 0.5;
+                                } elseif ($usiaBulan === 5) {
+                                    $kbm = ($jk === 'L') ? 0.5 : 0.4;
+                                } elseif ($usiaBulan === 6) {
+                                    $kbm = ($jk === 'L') ? 0.4 : 0.3;
+                                } elseif ($usiaBulan >= 7 && $usiaBulan <= 11) {
+                                    $kbm = 0.3;
+                                }
+
+                                // Cari data pemeriksaan bulan sebelumnya
+                                $queryLalu = \App\Models\PemeriksaanBayi::where('pasien_id', $pasienId);
+                                if ($record && $record->exists) {
+                                    $queryLalu->where('id', '!=', $record->id);
+                                }
+                                $pemeriksaanLalu = $queryLalu->orderBy('tgl_periksa', 'desc')->first();
 
                                 if ($pemeriksaanLalu && $pemeriksaanLalu->berat_badan) {
                                     $bbLalu = (float) $pemeriksaanLalu->berat_badan;
-                                    
-                                    // Logika Kemenkes Sederhana: Jika berat badan sekarang lebih besar dari bulan lalu, maka Naik (N)
-                                    if ($bbSekarang > $bbLalu) {
-                                        $set('kenaikan_bb', 'naik'); // Otomatis memilih opsi 'naik' (N)
-                                        $set('keterangan_bb', "Berat badan naik " . ($bbSekarang - $bbLalu) . " Kg dari bulan lalu.");
+                                    $kenaikanRiil = $bbSekarang - $bbLalu;
+
+                                    // 🟢 EVALUASI UTAMA SINKRONISASI KBM
+                                    // Walau timbangan naik (misal naik 0.5), jika di bawah target KBM (misal KBM harusnya 0.8), tetap dianggap TIDAK NAIK (T)
+                                    if ($kenaikanRiil >= $kbm) {
+                                        $set('kenaikan_bb', 'naik'); 
+                                        $set('keterangan_bb', "N (Naik). Timbangan naik " . number_format($kenaikanRiil, 2) . " Kg (Memenuhi standar KBM Kemenkes usia {$usiaBulan} bulan sebesar {$kbm} Kg).");
                                     } else {
-                                        $set('kenaikan_bb', 'tidak naik'); // Otomatis memilih opsi 'tidak naik' (T)
-                                        $set('keterangan_bb', "Berat badan tidak naik / turun dari bulan lalu.");
+                                        $set('kenaikan_bb', 'not_naik'); 
+                                        if ($kenaikanRiil > 0) {
+                                            $set('keterangan_bb', "T (Tidak Naik). Timbangan hanya naik " . number_format($kenaikanRiil, 2) . " Kg (TIDAK LOLOS standar KBM Kemenkes usia {$usiaBulan} bulan sebesar {$kbm} Kg).");
+                                        } else {
+                                            $set('keterangan_bb', "T (Tidak Naik). Timbangan menyusut / tetap sebesar " . number_format($kenaikanRiil, 2) . " Kg dari bulan lalu.");
+                                        }
                                     }
                                 } else {
-                                    // Jika ini adalah penimbangan pertama kali (bayi baru terdaftar)
+                                    // Kondisi anak baru pertama kali datang timbang di posyandu
                                     $set('kenaikan_bb', 'naik');
-                                    $set('keterangan_bb', "Penimbangan pertama kali (Baru terdaftar).");
+                                    $set('keterangan_bb', "Bulan ini dihitung N (Naik) karena merupakan penimbangan pertama kali di sistem.");
                                 }
                             }
                         }),
 
-                    // 2. Komponen Status Kenaikan BB yang akan terisi otomatis
-                    Select::make('kenaikan_bb')
-                        ->label('Status Kenaikan Berat Badan (N/T)')
+                    Forms\Components\Select::make('kenaikan_bb')
+                        ->label('Status Kenaikan Berat Badan (N/T) Kemenkes')
+                        ->placeholder('Akan terisi otomatis oleh sistem...')
                         ->options([
-                            'naik' => 'N (Berat Badan Naik)',
-                            'tidak naik' => 'T (Berat Badan Tidak Naik / Tetap / Turun)',
+                            'naik' => 'N (Berat Badan Naik Sesuai KBM)',
+                            'not_naik' => 'T (Berat Badan Tidak Naik / Kurang Dari KBM)',
                         ])
-                        ->required(),
+                        ->disabled() 
+                        ->dehydrated(),
 
-                    TextInput::make('keterangan_bb')
-                        ->label('Keterangan Detil Grafik KMS')
+                    Forms\Components\TextInput::make('keterangan_bb')
+                        ->label('Analisis Kenaikan Minimal (KMS)')
                         ->placeholder('Akan terisi otomatis oleh sistem...')
                         ->readOnly(),
-                    )
-
+                ])->columns(1),
+                
                 // --- MEJA 5: PELAYANAN & EVALUASI AKHIR ---
                 Forms\Components\Section::make('Pelayanan, Catatan & Hasil (Meja 5)')
                     ->description('Hasil Z-Score otomatis terisi jika data Meja 1-4 lengkap.')
                     ->visible(fn () => in_array(Auth::user()?->meja_tugas, ['meja_5', 'superadmin']))
                     ->schema([
-                        // 🟢 TAMPILAN READONLY HASIL Z-SCORE KEMENKES
                         Forms\Components\Fieldset::make('Kesimpulan Gizi Anak')
                             ->schema([
                                 Forms\Components\TextInput::make('status_gizi')->label('Status Gizi (BB/U)')->readOnly(),
@@ -288,7 +315,6 @@ class PemeriksaanBayiResource extends Resource
                                     ->default('tidak ada'),
                             ]),
                             
-                        // --- TOGGLE INTERVENSI & GIZI ---
                         Forms\Components\Grid::make(4) 
                             ->schema([
                                 Forms\Components\Toggle::make('vitamin_a')->label('Vit A?')->inline(false),
@@ -300,8 +326,7 @@ class PemeriksaanBayiResource extends Resource
                                 Forms\Components\Toggle::make('menerima_mbg')->label('Dapat MBG?')->inline(false),
                             ]),
                             
-                        
-                        Select::make('jenis_imunisasi')
+                        Forms\Components\Select::make('jenis_imunisasi')
                             ->label('Jenis Imunisasi Hari Ini')
                             ->multiple()
                             ->searchable()
@@ -331,7 +356,13 @@ class PemeriksaanBayiResource extends Resource
                             
                         Forms\Components\Grid::make(3)
                             ->schema([
-                                Forms\Components\Toggle::make('deteksi_tbc')->label('S. TBC (Deteksi)'),
+                                Forms\Components\Toggle::make('deteksi_tbc')
+                                    ->label('S. TBC (Deteksi)')
+                                    ->helperText(new \Illuminate\Support\HtmlString("
+                                        <span class='text-xs text-rose-600 font-medium block mt-1'>
+                                            ⚠️ Aktifkan jika balita Batuk/Demam &ge; 2 minggu, BB 2T, atau lesu.
+                                        </span>
+                                    ")),
                                 Forms\Components\Toggle::make('kie')->label('Sudah KIE/Konseling?'),
                                 Forms\Components\Toggle::make('rujuk')->label('Rujuk Ke Puskesmas?'),
                             ]),
@@ -342,14 +373,14 @@ class PemeriksaanBayiResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-                ->modifyQueryUsing(fn ($query) => $query
+            ->modifyQueryUsing(fn ($query) => $query
                 ->with(['pasien'])
                 ->whereIn('pemeriksaan_bayi.id', function ($subQuery) {
                     $subQuery->selectRaw('MAX(id)')
                         ->from('pemeriksaan_bayi')
                         ->groupBy('pasien_id');
                 })
-                )
+            )
             ->columns([
                 Tables\Columns\TextColumn::make('pasien.nama')->label('Nama Balita')->searchable(),
                 Tables\Columns\TextColumn::make('keterangan_umur')->label('Usia')->badge()->color('success'),
@@ -386,18 +417,17 @@ class PemeriksaanBayiResource extends Resource
                         if ($data['value'] === 'stunting') $query->whereIn('status_stunting', ['Sangat Pendek (Severely Stunted)', 'Pendek (Stunted)']);
                         elseif ($data['value'] === 'normal') $query->where('status_stunting', 'Normal');
                     }),
-                    Filter::make('tgl_periksa_range')
+                Tables\Filters\Filter::make('tgl_periksa_range')
                     ->label('Periode Pemeriksaan')
                     ->form([
-                        Select::make('quick_period')
+                        Forms\Components\Select::make('quick_period')
                             ->label('Pilihan Periode Cepat')
                             ->options([
                                 'this_week' => 'Minggu Ini',
                                 'this_month' => 'Bulan Ini',
                                 'this_year' => 'Tahun Ini',
-                            ],)->reactive()
+                            ])->reactive()
                             ->afterStateUpdated(function ($state, $set) {
-                                // Jika kader memilih opsi cepat, otomatis isi range tanggal di bawahnya
                                 if ($state === 'this_week') {
                                     $set('dari_tanggal', Carbon::now()->startOfWeek()->format('Y-m-d'));
                                     $set('sampai_tanggal', Carbon::now()->endOfWeek()->format('Y-m-d'));
@@ -409,25 +439,17 @@ class PemeriksaanBayiResource extends Resource
                                     $set('sampai_tanggal', Carbon::now()->endOfYear()->format('Y-m-d'));
                                 }
                             }),
-                        DatePicker::make('dari_tanggal')
-                            ->label('Dari Tanggal'),
-                        DatePicker::make('sampai_tanggal')
-                            ->label('Sampai Tanggal'),
+                        Forms\Components\DatePicker::make('dari_tanggal')->label('Dari Tanggal'),
+                        Forms\Components\DatePicker::make('sampai_tanggal')->label('Sampai Tanggal'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
-                            ->when(
-                                $data['dari_tanggal'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('tgl_periksa', '>=', $date),
-                            )
-                            ->when(
-                                $data['sampai_tanggal'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('tgl_periksa', '<=', $date),
-                            );
+                            ->when($data['dari_tanggal'], fn (Builder $query, $date): Builder => $query->whereDate('tgl_periksa', '>=', $date))
+                            ->when($data['sampai_tanggal'], fn (Builder $query, $date): Builder => $query->whereDate('tgl_periksa', '<=', $date));
                     }),
             ]) 
             ->actions([
-                // 🟢 TOMBOL AKSI CEPAT MEJA 2 (DENGAN INJEKSI Z-SCORE)
+                // Tombol Aksi Cepat Meja 2
                 Tables\Actions\Action::make('isi_tb')
                     ->label('Isi TB')
                     ->icon('heroicon-o-arrows-up-down')
@@ -467,7 +489,7 @@ class PemeriksaanBayiResource extends Resource
                         $record->update($updateData);
                     }),
 
-                // 🟢 TOMBOL AKSI CEPAT MEJA 3
+                // Tombol Aksi Cepat Meja 3
                 Tables\Actions\Action::make('isi_lk')
                     ->label('Isi LK & LiLA')
                     ->icon('heroicon-o-sparkles')
@@ -484,7 +506,7 @@ class PemeriksaanBayiResource extends Resource
                         ]);
                     }),
 
-                // 🟢 TOMBOL AKSI CEPAT MEJA 4 (DENGAN INJEKSI Z-SCORE)
+                // Tombol Aksi Cepat Meja 4
                 Tables\Actions\Action::make('isi_bb')
                     ->label('Isi BB')
                     ->icon('heroicon-o-scale')
@@ -521,23 +543,7 @@ class PemeriksaanBayiResource extends Resource
                         $record->update($updateData);
                     }),
 
-                   
-
-                    Toggle::make('deteksi_tbc')
-                        ->label('Indikasi / Gejala TBC Anak')
-                        ->default(false)
-                        ->inline(false)
-                        // 🟢 Menyuntikkan panduan edukasi Kemenkes langsung ke layar form kader
-                        ->helperText(new \Illuminate\Support\HtmlString("
-                            <span class='text-xs text-rose-600 font-medium block mt-1'>
-                                ⚠️ Aktifkan sakelar ini jika balita memenuhi salah satu gejala klinis berikut:<br>
-                                1. Batuk terus-menerus selama &ge; 2 minggu.<br>
-                                2. Demam &ge; 2 minggu tanpa penyebab yang jelas.<br>
-                                3. Berat badan turun atau tidak naik dalam 2 bulan berturut-turut (2T).<br>
-                                4. Anak tampak lesu, letih, dan tidak seaktif biasanya.
-                            </span>
-                        ")),
-
+                // 🟢 FIX 2: Menghapus komponen Toggle yang nyasar dari area ->actions() tabel
                 Tables\Actions\EditAction::make()
                     ->label(fn () => Auth::user()?->meja_tugas === 'meja_5' ? 'Evaluasi (Meja 5)' : 'Ubah')
                     ->icon(fn () => Auth::user()?->meja_tugas === 'meja_5' ? 'heroicon-o-clipboard-document-check' : 'heroicon-o-pencil')
@@ -559,8 +565,6 @@ class PemeriksaanBayiResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        // Menggunakan ::with(['pasien']) memaksa Laravel menggunakan Eager Loading.
-        // Hanya akan terjadi 2 Query SQL ke database berapapun baris data yang difilter!
         return parent::getEloquentQuery()->with(['pasien']);
     }
 
